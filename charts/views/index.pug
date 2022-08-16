@@ -1,0 +1,15 @@
+extends layout
+
+block layout-content
+  #message
+    h3 Input the chart data to show in JSON format
+  #form
+    form(method="post" action="/chart")
+      #text
+      textarea(name="chartparams" rows=30 cols=100).
+        #{default_chart_conf}
+      #button
+      input(type='submit' value='Submit')
+      
+      
+        

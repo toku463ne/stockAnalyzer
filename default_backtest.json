@@ -1,0 +1,5 @@
+{
+    "ticker_code": "^N225",
+    "ticker_granularity": "H",
+    "commission": 100
+}

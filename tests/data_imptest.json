@@ -1,0 +1,8 @@
+{
+    "codenames": ["^N225", "1332.T"],
+    "random_cnt": 0,
+    "granularity": "D",
+    "start_date": "2021-01-01",
+    "end_date": "2022-01-01",
+    "is_test": true
+}

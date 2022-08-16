@@ -1,0 +1,3 @@
+{
+    "^N225": {"name": "Nikkei 225", "market": "index", "market_type": "domestic"}
+}

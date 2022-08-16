@@ -1,0 +1,11 @@
+extends layout
+
+block layout-content
+    script(src='https://cdn.amcharts.com/lib/5/index.js')
+    script(src='https://cdn.amcharts.com/lib/5/xy.js')
+    script(src='https://cdn.amcharts.com/lib/5/themes/Animated.js')
+    script(src='js/amchart.js')
+    script(). 
+        showAmChart(#{chart_params})
+    div.chartdiv
+    

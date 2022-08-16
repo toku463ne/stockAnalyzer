@@ -1,0 +1,19 @@
+---
+mysql:
+  host: localhost
+  db: stockanalyzer
+  test_db: stockanalyzer_test
+  user: stockuser
+  password: stockpass
+
+data_sources:
+  - yf
+  - mysql
+
+data_download_interval: 10
+
+pyapi:
+  host: localhost
+  port: 9000
+
+tmp_dir: /tmp

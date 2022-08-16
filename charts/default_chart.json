@@ -1,0 +1,9 @@
+{
+    "codename": "MSFT",
+    "granularity": "D",
+    "start_date": "2021-11-01",
+    "end_date": "2021-12-01",
+    "sub_charts": [
+        {"name": "sma", "span": 5, "type": "sma"}
+    ]
+}

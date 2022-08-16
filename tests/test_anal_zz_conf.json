@@ -1,0 +1,8 @@
+{
+    "granularity": "D",
+    "size": 5,
+    "start_date": "2015-01-01",
+    "end_date": "2022-01-01",
+    "codenames": ["6042.T", "6360.T"],
+    "description": "2015-2022, 2 stocks"
+}
