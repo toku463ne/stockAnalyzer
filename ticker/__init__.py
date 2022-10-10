@@ -8,13 +8,22 @@ ERR_NODATA = 1
 ERR_EOF = 2
 
 class Ticker(object):
-    def __init__(self, codename, granularity, startep, endep, **args):
+    def __init__(self, codename, granularity, 
+        startep, endep=0, buffNbars=100, **args):
         self.codename = codename
         self.granularity = granularity
+        self.buffNbars = buffNbars
         dg = data_getter.getDataGetter(self.codename, self.granularity)
-        ohlcv = dg.getPrices(startep, endep)
+        self.dg = dg
         self.unitsecs = dg.unitsecs
-        self.initData(ohlcv, **args)
+        self.args = args
+        self._resetData(startep, endep)
+
+    def _resetData(self, startep, endep=0):
+        if endep == 0:
+            endep = startep + self.unitsecs*self.buffNbars
+        ohlcv = self.dg.getPrices(startep, endep)
+        self.initData(ohlcv, **self.args)
         self.index = -1
         self.err = ERR_NONE
         self.data = None
@@ -22,16 +31,18 @@ class Ticker(object):
     # must inherit
     def initData(self, ohlcv, **args):
         (ep, dt, o, h, l, c, v) = ohlcv
-        self.ep = ep.tolist()
+        self.ep = ep
         self.dt = dt
-        self.o = o.tolist()
-        self.h = h.tolist()
-        self.l = l.tolist()
-        self.c = c.tolist()
-        self.v = v.tolist()
+        self.o = o
+        self.h = h
+        self.l = l
+        self.c = c
+        self.v = v
 
     # must inherit
-    def getData(self, i, n=1):
+    def getData(self, i=-1, n=1):
+        if i == -1 and self.err == ERR_NONE:
+            i = self.index
         if n == 1 and i >= 0:
             return (self.ep[i], self.dt[i],self.o[i],self.h[i],self.l[i],self.c[i],self.v[i])
         elif i >= 0:
@@ -46,10 +57,11 @@ class Ticker(object):
             return (0,None,0,0,0,0,0)
 
     def getTickEvent(self):
-        self.tick()
-        (ep, _, o, h, l, c, v) = self.data
-        return TickEvent(ep, o, h, l, c, v)
-
+        if self.tick():
+            (ep, _, o, h, l, c, v) = self.data
+            return TickEvent(ep, c, o, h, l, c, v)
+        else:
+            return None
 
     def getPrevIndex(self, ep, searchStartI=0):
         eps = self.ep
@@ -62,6 +74,15 @@ class Ticker(object):
     def getPrevEpoch(self, ep, searchStartI=0):
         i = self.getPrevIndex(ep, searchStartI)
         return self.ep[i]
+
+    def getPrice(self, ep):
+        if self.tick(ep) == False:
+            if self.err == ERR_EOF and self.index == -1:
+                self._resetData(ep)
+            if self.tick(ep) == False:
+                raise Exception("No data for epoch=%d" % ep)
+        return self.getData()  
+
 
 
     def getPostIndex(self, ep, searchStartI=0):
@@ -86,6 +107,11 @@ class Ticker(object):
             return False
         n = len(self.ep)
         if ep > 0:
+            if ep > self.ep[-1]:
+                self.err = ERR_EOF
+                self._setCurrData(-1)
+                self.index = -1
+                return False
             i = 0
             if self.index >= 0 and ep > self.ep[self.index]: 
                 i = self.index

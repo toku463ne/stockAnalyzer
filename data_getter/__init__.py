@@ -14,6 +14,9 @@ def getDataGetter(codename, granularity, is_dgtest=False):
         if ds == "mysql":
             import data_getter.my_getter
             dg = data_getter.my_getter.MyGetter(dg, is_dgtest=is_dgtest)
+        if ds == "onmem":
+            import data_getter.onmem_getter
+            dg = data_getter.onmem_getter.OnMemGetter(dg, is_dgtest=is_dgtest)
     return dg
 
 def getAllTables():
@@ -42,6 +45,10 @@ class DataGetter(object):
 
     # must implement
     def getPrices(self, startep, endep):
+        pass
+
+
+    def getPrice(self, epoch):
         pass
 
     def _getPricesFromChild(self, startep, endep, waitDownload=True):

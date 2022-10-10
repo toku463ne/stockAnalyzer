@@ -9,6 +9,7 @@ mysql:
 data_sources:
   - yf
   - mysql
+  - onmem
 
 data_download_interval: 10
 

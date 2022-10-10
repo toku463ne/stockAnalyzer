@@ -1,104 +1,94 @@
-import env
-import lib
-import copy
+from env import *
+from consts import *
 
 class TradeManager(object):
-    def __init__(self, name):
+    def __init__(self, name, timeTicker, strategy, executor, portforio):
         self.name = name
-        self.maxID = 0
+        self.maxId = 0
         self.orders = {}
-        self.transactions = []
+        self.trans = []
         self.history = []
+        self.executor = executor
+        self.strategy = strategy
+        self.timeTicker = timeTicker
+        self.portforio = portforio
         
-    def genID(self):
-        self.maxID += 1
-        return self.maxID
-    
-    def IDExists(self, _id):
-        if _id in self.orders.keys():
-            return True
-        else:
-            return False
         
-    def openOrder(self, tickEvent, orderEvent):
-        _id = orderEvent.id
-        if not _id in self.orders.keys():
-            orderEvent.epoch = tickEvent.time
-            orderEvent.status = env.ESTATUS_ORDER_OPENED
-            self.orders[_id] = orderEvent
-            if orderEvent.validep == 0:
-                validstr = ""
-            else:
-                validstr = "valid=%s" % lib.epoch2str(orderEvent.validep)
-            lib.printMsg(orderEvent.epoch, "[%s] Order %d opened. %f side=%d tp=%f sl=%f %s" % (
-                        self.name,
-                        _id, 
-                        orderEvent.price, orderEvent.side,
-                        orderEvent.takeprofit_price, 
-                        orderEvent.stoploss_price,
-                        validstr
-                        ))
-        else:
-            raise Exception("Order %d already open." % _id)
-    
-    def openTrade(self, tickEvent, orderEvent, price, desc=""):
-        orderEvent.open_trade(tickEvent, price, desc)
-        self.updateOrder(orderEvent)
-        lib.printMsg(tickEvent.time, "[%s] Trade %d opened. %f" % (
-                        self.name,
-                        orderEvent.id, 
-                        price))
+    def run(self, endep=-1):
+        order_events = []
+        strategy = self.strategy
+        executor = self.executor
+        portforio = self.portforio
         
-    def closeOrder(self, tickEvent, orderEvent, desc=""):
-        _id = orderEvent.id
-        orderEvent.close_order(tickEvent, desc)
-        if _id in self.orders.keys():
-            self.history.append(orderEvent)
-            del self.orders[_id]
-            lib.printMsg(tickEvent.time, "[%s] Order %d closed. %s" % (
-                        self.name,
-                        _id, 
-                        orderEvent.desc))
+        t = self.timeTicker
+        while True:
+            epoch = t.epoch
+            if endep > 0 and epoch > endep:
+                break
+            
+            portforio.onTick(self.orders)
+            events = self.checkEvents(epoch)
+            while len(events) > 0:
+                event = events.pop(0)
+                strategy.onSignal(event)
+                portforio.onSignal(event)
+            
+            order_events = strategy.onTick(epoch)
+            while len(order_events) > 0:
+                order = order_events.pop(0)
+                if executor.checkOrder(epoch, order):
+                    self.receiveOrder(order)
+                else:
+                    strategy.onError(order)
+
+                
+            
+            for _id in self.orders.keys():
+                if self.orders[_id].status in [ESTATUS_ORDER_CLOSED, ESTATUS_TRADE_CLOSED]:
+                    del self.orders[_id]
+            
+            if t.tick() == False:
+                break
+
+
+    def genId(self):
+        self.maxId += 1
+        return self.maxId
+
     
-    def closeTrade(self, tickEvent, orderEvent, price, desc=""):
-        orderEvent.close_trade(tickEvent, price, desc)
-        self.history.append(orderEvent)
-        del self.orders[orderEvent.id]
-        lib.printMsg(tickEvent.time, "[%s] Trade %d closed. %f profit=%f %s" % (
-                        self.name,
-                        orderEvent.id, 
-                        orderEvent.trade_close_price, 
-                        orderEvent.trade_profit, 
-                        orderEvent.desc))
-    
-    def flushHistory(self):
-        self.history = []
-      
+    def receiveOrder(self, orderEvent):
+        orderEvent.setId(self.genId())
+        self.trans.append(orderEvent)
+
     def getOrder(self, _id):
         if _id in self.orders.keys():
             return self.orders[_id]
         else:
             return None
-    
-    def getOrders(self):
-        return copy.deepcopy(self.orders)
-    
-    def updateOrder(self, orderEvent):
-        _id = orderEvent.id
-        if _id in self.orders.keys():
-            self.orders[_id] = orderEvent
-    
-    def appendTransaction(self, orderEvent):
-        return self.transactions.append(orderEvent)
-            
-    def popTransaction(self):
-        return self.transactions.pop(0)
-    
-    def issueError(self, tickEvent, orderEvent):
-        _id = orderEvent.id
-        orderEvent.close_order(tickEvent, orderEvent.desc)
-        lib.printMsg(tickEvent.time, "[%s] Order %d error. %f %s" % (
-                        self.name,
-                        orderEvent.id, 
-                        orderEvent.price,
-                        orderEvent.desc))
+
+    def checkEvents(self, epoch):
+        signal_events = []
+
+        for _id in self.orders.keys():
+            orderEvent = self.orders[_id]
+            signal = self.executor.detectOrderChange(epoch, orderEvent)
+            if signal != None:
+                signal_events.append(signal)
+
+        while len(self.trans) > 0:
+            orderEvent = self.trans.pop()
+            _id = orderEvent.id
+            if _id in self.orders.keys():
+                if orderEvent.cmd == CMD_CANCEL:
+                    signal = self.executor.cancelOrder(epoch, _id)
+                    signal_events.append(signal)
+                    continue
+                else:
+                    raise Exception("id=%d already exists!" % _id)
+
+            if orderEvent.cmd in [CMD_CREATE_STOP_ORDER,
+                             CMD_CREATE_LIMIT_ORDER,
+                             CMD_CREATE_MARKET_ORDER]:
+                self.orders[_id] = orderEvent
+
+        return signal_events

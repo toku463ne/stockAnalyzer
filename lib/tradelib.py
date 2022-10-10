@@ -37,3 +37,9 @@ def getMin(ep, p):
             miv = p[i]
             mit = ep[i]
     return (mit, miv)
+
+
+def getDecimalPlace(instrument):
+    suff = instrument[:-2]
+    if suff == ".T":
+        return 2

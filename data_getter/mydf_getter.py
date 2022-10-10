@@ -1,3 +1,4 @@
+from http.client import REQUEST_URI_TOO_LONG
 import pandas as pd
 import lib.sqlib as sqlib
 
@@ -46,6 +47,12 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
     def upsertData(self, df):
         if len(df) == 0:
             return
+    
+        try:
+            len(df.index)
+        except:
+            return
+
         #df.to_sql(self.tableName, 
         #    self.conn, if_exists='append', index=False)
         sql = "replace into %s(EP, DT, O, H, L, C, V) values" % (self.tableName)

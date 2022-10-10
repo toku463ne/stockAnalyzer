@@ -7,13 +7,14 @@ import lib
 class TestSimpleStopStrategy(unittest.TestCase):
     def testCase1(self):
         
-        instrument = "^N225"
-        granularity = "H1"
-        st = lib.str2epoch("2021-11-01T00:00:00")
+        ticker_instrument = "^N225"
+        instrument = "1332.T"
+        granularity = "D"
+        st = lib.str2epoch("2020-12-01T00:00:00")
         ed = lib.str2epoch("2021-12-01T00:00:00")
         
         strategy = SimpleStopStrategy(instrument, granularity, 500)
-        history = runTestingBacktest("c2", instrument, 
+        history = runTestingBacktest("c2", ticker_instrument, granularity,
                        st, ed, strategy)
         
         res = history[0]
