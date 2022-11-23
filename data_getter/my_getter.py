@@ -11,15 +11,15 @@ class MyGetter(DataGetter):
         self.mydf = MyDfGetter(childDG, tableNamePrefix, is_dgtest=is_dgtest)
         self.unitsecs = self.mydf.unitsecs
 
-    def getPrices(self, startep, endep, waitDownload=True):
-        df = self.mydf.getPrices(startep, endep, waitDownload)
-        ep = list(df.EP.values)
-        dt = list(df.DT.values)
-        o = list(df.O.values)
-        h = list(df.H.values)
-        l = list(df.L.values)
-        c = list(df.C.values)
-        v = list(df.V.values)
+    def getPrices(self, startep, endep, waitDownload=True, buff_size=0):
+        df = self.mydf.getPrices(startep, endep, waitDownload, buff_size=buff_size)
+        ep = df.EP.values.tolist()
+        dt = df.DT.values.tolist()
+        o = df.O.values.tolist()
+        h = df.H.values.tolist()
+        l = df.L.values.tolist()
+        c = df.C.values.tolist()
+        v = df.V.values.tolist()
         return (ep, dt, o, h, l, c, v)
         
     def drop(self):

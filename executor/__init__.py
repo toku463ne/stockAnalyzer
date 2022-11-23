@@ -26,26 +26,32 @@ class Executor(object):
 
     # TODO: Issue error when the order is strange
     def detectOrderChange(self, epoch, orderEvent):
-        (_, _, _, h, l, _, _) = orderEvent.getPrice(epoch)
+        (_, _, _, h, l, c, _) = orderEvent.getPrice(epoch)
         side = orderEvent.side
+        price = (h+l+c)*1.0/3.0
+        orderEvent.price = price
+
+        if orderEvent.cmd == CMD_CANCEL:
+            self.executor.cancelOrder(epoch, orderEvent)
+            return orderEvent
         
         if orderEvent.status == ESTATUS_ORDER_OPENED:
             if orderEvent.cmd == CMD_CREATE_MARKET_ORDER:
-                orderEvent.openTrade(epoch, orderEvent, price, "Market order")
+                orderEvent.openTrade(epoch, price, "Market order")
                 return orderEvent
                 
             elif orderEvent.cmd == CMD_CREATE_STOP_ORDER:
                 
                 
                 if orderEvent.is_valid(epoch) == False:
-                    orderEvent.closeOrder(epoch, orderEvent, "expired")
+                    orderEvent.closeOrder(epoch, "expired")
                     return orderEvent
                 else:
                     if side == SIDE_BUY and orderEvent.price > l:
-                        orderEvent.openTrade(epoch, orderEvent, price, "Stop order")
+                        orderEvent.openTrade(epoch, price, "Stop order")
                         return orderEvent
                     if side == SIDE_SELL and orderEvent.price < h:
-                        orderEvent.openTrade(epoch, orderEvent, price, "Stop order")
+                        orderEvent.openTrade(epoch, price, "Stop order")
                         return orderEvent
   
             else:
@@ -72,11 +78,17 @@ class Executor(object):
                     price = tp
             
             if iswin == 1:
-                orderEvent.closeTrade(epoch, orderEvent, price, "takeprofit")
+                orderEvent.closeTrade(epoch, price, "takeprofit")
                 return orderEvent
             if iswin == -1:
-                orderEvent.closeTrade(epoch, orderEvent, price, "stoploss")
+                orderEvent.closeTrade(epoch, price, "stoploss")
                 return orderEvent
+        elif orderEvent.status == ESTATUS_NONE:
+            if orderEvent.cmd == CMD_CREATE_MARKET_ORDER or orderEvent.cmd == CMD_CREATE_STOP_ORDER:
+                orderEvent.openTrade(epoch, price)
+                return orderEvent
+
+
 
         return None
 

@@ -7,22 +7,26 @@ class Strategy(object):
         pass
     
     # return void
-    def onSignal(self, event):
+    def onSignal(self, epoch, event):
         pass
 
     def createMarketOrder(self, epoch, data_getter, side, units, price,
                         validep=0, takeprofit=0, stoploss=0, desc=""):
-        return OrderEvent(CMD_CREATE_MARKET_ORDER, data_getter, 
+        order = OrderEvent(CMD_CREATE_MARKET_ORDER, data_getter, 
                           epoch=epoch, side=side,
                           units=units, price=price, validep=validep, 
                           takeprofit=takeprofit, stoploss=stoploss, desc=desc)
+        #order.openTrade(epoch, price, desc)
+        return order
     
     def createStopOrder(self, epoch, data_getter, side, units, price,
                         validep=0, takeprofit=0, stoploss=0, desc=""):
-        return OrderEvent(CMD_CREATE_STOP_ORDER, data_getter, 
+        order = OrderEvent(CMD_CREATE_STOP_ORDER, data_getter, 
                           epoch=epoch, side=side,
                           units=units, price=price, validep=validep, 
                           takeprofit=takeprofit, stoploss=stoploss, desc=desc)
+        #order.openTrade(epoch, price, desc)
+        return order
         
     def cancelOrder(self, _id):
         return OrderEvent(_id, CMD_CANCEL)

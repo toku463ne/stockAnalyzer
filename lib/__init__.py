@@ -1,14 +1,16 @@
 # Do NOT import env
 import datetime, calendar, time, pytz
 import os
+import math
 DEFAULT_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 def epoch2dt(epoch):
     d = datetime.datetime.utcfromtimestamp(epoch)
     return d
 
+# Thu=0, Fri=1, Sat=2, Sun=3, Mon=4, Tue=5, Wed=6
 def dt2epoch(gmdt):
-    return int(calendar.timegm(gmdt.timetuple()))
+    return math.floor(calendar.timegm(gmdt.timetuple()))
 
 def str2dt(strgmdt, format=DEFAULT_DATETIME_FORMAT):
     d = datetime.datetime.strptime(strgmdt, format)
@@ -26,6 +28,9 @@ def epoch2str(epoch, format=DEFAULT_DATETIME_FORMAT):
 
 def nowepoch():
     return time.time()
+
+def epoch2weeknum(epoch):
+    return int(epoch % (86400*7) / 86400)
 
 def list2str(list1, sep=",", enquote=False):
     s = ""

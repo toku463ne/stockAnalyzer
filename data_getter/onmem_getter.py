@@ -1,14 +1,18 @@
 from data_getter.my_getter import MyGetter
 from data_getter import DataGetter
 import lib.naming as naming
+import lib
 
 class OnMemGetter(DataGetter):
     def __init__(self,childDG, tableNamePrefix="", is_dgtest=False, 
-            memSize=10000, extendSize=2000):
+            memSize=10000, extendSize=100):
         self.name = "onmem_getter_%s_%s" % (childDG.codename, childDG.granularity)
         self.tableName = naming.priceTable(childDG.codename, childDG.granularity, tableNamePrefix)
         self.childDG = MyGetter(childDG, tableNamePrefix, is_dgtest=is_dgtest)
         self.unitsecs = self.childDG.unitsecs
+        self.codename = self.childDG.codename
+        self.granularity = self.childDG.granularity
+        
         self.memSize = memSize
         self.extendSize = extendSize
 
@@ -33,6 +37,9 @@ class OnMemGetter(DataGetter):
         
 
     def getPrices(self, startep, endep, waitDownload=True):
+        nowep = lib.nowepoch()
+        endep = min(nowep, endep)
+
         starti = self.getIndex(startep)
         endi = self.getIndex(endep)
         if starti >= 0  and endi >= 0:
@@ -40,13 +47,14 @@ class OnMemGetter(DataGetter):
             self.o[starti:endi+1], self.h[starti:endi+1], 
             self.l[starti:endi+1], self.c[starti:endi+1], self.v[starti:endi+1])
 
+        
         if len(self.ep) == 0:
             if (endep - startep) / self.unitsecs < self.extendSize:
-                    child_endep = startep + self.extendSize * self.unitsecs
+                    child_endep = min(startep + self.extendSize * self.unitsecs, nowep)
             else:
                 child_endep = endep
             (ep, dt, o, h, l, c, v) = self.childDG.getPrices(startep, 
-                    child_endep, waitDownload)
+                    child_endep, waitDownload, buff_size=self.extendSize/2)
             self.ep = ep
             self.dt = dt
             self.o = o
@@ -86,9 +94,10 @@ class OnMemGetter(DataGetter):
             if endep > self.ep[-1]:
                 if (endep - self.ep[-1]) / self.unitsecs < self.extendSize:
                     child_endep = self.ep[-1] + self.extendSize * self.unitsecs
+                    child_endep = min(child_endep, nowep)
                 else:
                     child_endep = endep
-                child_startep = self.ep[-1]+1
+                child_startep = self.ep[-1]
                 
                 self._extendPrices(child_startep, child_endep, True, waitDownload)
             elif endep > self.ep[0]:
@@ -139,7 +148,7 @@ class OnMemGetter(DataGetter):
 
     def _extendPrices(self, child_startep, child_endep, extendAfter=True,waitDownload=True):
         (ep, dt, o, h, l, c, v) = self.childDG.getPrices(child_startep, 
-                    child_endep, waitDownload)
+                    child_endep, waitDownload, buff_size=self.extendSize)
         if extendAfter:
             self.ep.extend(ep)
             self.dt.extend(dt)

@@ -70,7 +70,7 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
 
 
 
-    def getPrices(self, startep, endep, waitDownload=True):
+    def getPrices(self, startep, endep, waitDownload=True, buff_size=0):
         upd_startep = startep
         upd_endep = endep
         (minep, maxep) = self.getMinMaxEpoch()
@@ -84,18 +84,20 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
         else:
             upd_endep += self.buffer_secs
         
-        df = self.getData(condList=["EP >= %d" % startep ,"EP <= %d" % endep])
+        df = self.getData(condList=["EP >= %d" % (startep) ,"EP <= %d" % (endep)])
         need_reselect = False
         if len(df.index) == 0:
             need_reselect = True
             self.upsertData(self._getPricesFromChild(upd_startep, upd_endep, waitDownload))
         else:
-            if startep < df.iloc[0]["EP"]:
+            if startep + buff_size*self.unitsecs < df.iloc[0]["EP"] - self.unitsecs + 1:
                 need_reselect = True
-                self.upsertData(self._getPricesFromChild(upd_startep, df.iloc[0]["EP"]-1, waitDownload))
-            if endep > df.iloc[-1]["EP"]:
+                self.upsertData(self._getPricesFromChild(upd_startep, 
+                    df.iloc[0]["EP"] - self.unitsecs, waitDownload))
+            if endep - buff_size*self.unitsecs > df.iloc[-1]["EP"]:
                 need_reselect = True
-                self.upsertData(self._getPricesFromChild(df.iloc[-1]["EP"]+1, upd_endep, waitDownload))
+                self.upsertData(self._getPricesFromChild(df.iloc[-1]["EP"]+self.unitsecs, 
+                    upd_endep, waitDownload))
         if need_reselect:
             return self.getData(condList=["EP >= %d" % startep ,"EP <= %d" % endep])
         else:
