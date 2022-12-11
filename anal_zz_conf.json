@@ -1,6 +1,9 @@
 {
     "granularity": "D",
-    "size": 5,
+    "n_points": 5,
+    "zz_size": 5,
+    "work_dir": "stockanalyzer/zz",
+    "kmpkl_file": "km_2015-2021.pkl",
     "start_date": "2015-01-01",
     "end_date": "2022-01-01",
     "reliable_cluster_size": 10,

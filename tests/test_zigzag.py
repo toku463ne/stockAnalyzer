@@ -3,47 +3,47 @@ import __init__
 from ticker.zigzag import Zigzag
 from datetime import datetime
 import pandas as pd
-import ticker.ticker as ticker
+import ticker
+from consts import *
 
 class TestZigzag(unittest.TestCase):
     def test_zigzag(self):
-        st = datetime(year=2021, month=11, day=1, hour=9).timestamp()
+        st = datetime(year=2022, month=2, day=1, hour=9).timestamp()
         ed = datetime(year=2022, month=4, day=1, hour=9).timestamp()
         
-        t = Zigzag("MSFT", "D", st, ed, size=5)
+        t = Zigzag("^N225", "D", st, ed, size=5)
+        ep = datetime(year=2022, month=2, day=17, hour=9).timestamp()
+        self.assertTrue(t.tick(ep))
+        self.assertEqual(t.err, TICKER_NODATA)
+        
+
         self.assertTrue(t.tick())
         (ep, dt, d, p) = t.data
-        self.assertEqual(pd.to_datetime(dt).day, 5)
-        self.assertEqual(pd.to_datetime(dt).month, 11)
+        self.assertEqual(pd.to_datetime(dt).day, 10)
+        self.assertEqual(pd.to_datetime(dt).month, 2)
         self.assertTrue(ep > 0.0)
         self.assertTrue(p > 0.0)
         
+
         self.assertTrue(t.tick())
-        (ep, dt, p) = t.data
-        self.assertEqual(pd.to_datetime(dt).day, 8)
-        self.assertEqual(pd.to_datetime(dt).month, 11)
-        
-        self.assertTrue(t.tick(ep + t.unitsecs*2))
-        (ep, dt, p) = t.data
+        (ep, dt, d, p) = t.data
         self.assertEqual(pd.to_datetime(dt).day, 10)
-        self.assertEqual(pd.to_datetime(dt).month, 11)
+        self.assertEqual(pd.to_datetime(dt).month, 2)
         
-        self.assertTrue(t.tick(ep - t.unitsecs*6))
-        (ep_err, dt, p) = t.data
-        self.assertEqual(ep_err, 0)
-        self.assertEqual(t.err, ticker.ERR_NODATA)
+        ep = datetime(year=2022, month=3, day=3, hour=9).timestamp()
+        self.assertTrue(t.tick(ep))
+        (ep, dt, d, p) = t.data
+        self.assertEqual(pd.to_datetime(dt).day, 24)
+        self.assertEqual(pd.to_datetime(dt).month, 2)
+        
+        self.assertTrue(t.tick())
+        self.assertTrue(t.tick())
+        self.assertTrue(t.tick())
+        (ep_err, dt, d, p) = t.data
+        self.assertEqual(pd.to_datetime(dt).day, 1)
+        self.assertEqual(pd.to_datetime(dt).month, 3)
         
 
-        self.assertTrue(t.tick(ep + t.unitsecs*20))
-        (ep, dt, p) = t.data
-        self.assertEqual(pd.to_datetime(dt).day, 30)
-        self.assertEqual(pd.to_datetime(dt).month, 11)
-        
-        self.assertFalse(t.tick())
-        (ep, dt, p) = t.data
-        self.assertEqual(ep, 0)
-        self.assertEqual(t.err, ticker.ERR_EOF)
-        
 
 
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
 CREATE TABLE IF NOT EXISTS #TABLENAME# (
     `km_groupid` INT NOT NULL,
     `count` INT,
-    `mean` FLOAT,
-    `std` FLOAT,
+    `meanx` FLOAT,
+    `meany` FLOAT,
+    `stdx` FLOAT,
+    `stdy` FLOAT,
     `last_epoch` FLOAT,
     #XYCOLUMS#,
     PRIMARY KEY(`km_groupid`)

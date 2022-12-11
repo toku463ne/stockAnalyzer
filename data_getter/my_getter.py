@@ -1,6 +1,9 @@
 from data_getter.mydf_getter import MyDfGetter
 from data_getter import DataGetter
 import lib.naming as naming
+import datetime
+import pandas as pd
+import lib
 
 class MyGetter(DataGetter):
     def __init__(self,childDG, tableNamePrefix="", is_dgtest=False):
@@ -14,7 +17,12 @@ class MyGetter(DataGetter):
     def getPrices(self, startep, endep, waitDownload=True, buff_size=0):
         df = self.mydf.getPrices(startep, endep, waitDownload, buff_size=buff_size)
         ep = df.EP.values.tolist()
-        dt = df.DT.values.tolist()
+        #dt = df.DT.values.tolist()
+        #dt = df.DT.values.astype(datetime.datetime)
+        #dt = pd.Timestamp(df.DT.values)
+        dt = []
+        for dt64 in df.DT.values:
+            dt.append(lib.npdt2dt(dt64))
         o = df.O.values.tolist()
         h = df.H.values.tolist()
         l = df.L.values.tolist()

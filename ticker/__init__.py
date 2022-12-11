@@ -3,9 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import data_getter
 from event.tick import TickEvent
-ERR_NONE = 0
-ERR_NODATA = 1
-ERR_EOF = 2
+from consts import *
 
 class Ticker(object):
     def __init__(self, codename, granularity, 
@@ -22,11 +20,14 @@ class Ticker(object):
     def _resetData(self, startep, endep=0):
         if endep == 0:
             endep = startep + self.unitsecs*self.buffNbars
+        else:
+            endep += self.unitsecs*self.buffNbars
         ohlcv = self.dg.getPrices(startep, endep)
         self.initData(ohlcv, **self.args)
         self.index = -1
-        self.err = ERR_NONE
+        self.err = TICKER_ERR_NONE
         self.data = None
+
 
     # must inherit
     def initData(self, ohlcv, **args):
@@ -41,7 +42,7 @@ class Ticker(object):
 
     # must inherit
     def getData(self, i=-1, n=1):
-        if i == -1 and self.err == ERR_NONE:
+        if i == -1 and self.err == TICKER_ERR_NONE:
             i = self.index
         if n == 1 and i >= 0:
             return (self.ep[i], self.dt[i],self.o[i],self.h[i],self.l[i],self.c[i],self.v[i])
@@ -77,7 +78,7 @@ class Ticker(object):
 
     def getPrice(self, ep):
         if self.tick(ep) == False:
-            if self.err == ERR_EOF and self.index == -1:
+            if self.err == TICKER_ERR_EOF and self.index == -1:
                 self._resetData(ep)
             if self.tick(ep) == False:
                 raise Exception("No data for epoch=%d" % ep)
@@ -100,15 +101,28 @@ class Ticker(object):
         else:
             self.data = self.getData(-1)
 
+    def _deleteOld(self, oldi):
+        rmi = min(self.index, oldi)
+        self.ep = self.ep[rmi+1:]
+        self.dt = self.dt[rmi+1:]
+        self.o = self.o[rmi+1:]
+        self.h = self.h[rmi+1:]
+        self.l = self.l[rmi+1:]
+        self.c = self.c[rmi+1:]
+        self.v = self.v[rmi+1:]
+        self.index -= rmi
+
     def tick(self, ep=0):
-        if self.err == ERR_EOF:
+        if self.err == TICKER_ERR_EOF:
             self._setCurrData(-1)
-            self.err = ERR_EOF
+            self.err = TICKER_ERR_EOF
             return False
         n = len(self.ep)
+        if n == 0:
+            return False
         if ep > 0:
             if ep > self.ep[-1]:
-                self.err = ERR_EOF
+                self.err = TICKER_ERR_EOF
                 self._setCurrData(-1)
                 self.index = -1
                 return False
@@ -126,20 +140,20 @@ class Ticker(object):
                         self.index = j
                         self._setCurrData(j)
                     else:
-                        self.err = ERR_NODATA
+                        self.err = TICKER_NODATA
                         self._setCurrData(-1)
                     return True
                 i += 1
         else:
             self.index += 1
             if self.index >= n:
-                self.err = ERR_EOF
+                self.err = TICKER_ERR_EOF
                 self._setCurrData(-1)
                 return False
             i = self.index
             self._setCurrData(i)
             return True
-        self.err = ERR_NODATA
+        self.err = TICKER_NODATA
         self._setCurrData(-1)
         return False
 

@@ -39,6 +39,7 @@ class TradeManager(object):
                 event = events.pop(0)
                 strategy.onSignal(epoch, event)
                 portforio.onSignal(epoch, event)
+
             
             if t.tick() == False:
                 break

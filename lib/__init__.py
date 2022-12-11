@@ -2,6 +2,11 @@
 import datetime, calendar, time, pytz
 import os
 import math
+import numpy as np
+unix_epoch = np.datetime64(0, 's')
+one_second = np.timedelta64(1, 's')
+    
+
 DEFAULT_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 def epoch2dt(epoch):
@@ -31,6 +36,12 @@ def nowepoch():
 
 def epoch2weeknum(epoch):
     return int(epoch % (86400*7) / 86400)
+
+
+def npdt2dt(dt64):
+    seconds_since_epoch = (dt64 - unix_epoch) / one_second
+    return datetime.datetime.utcfromtimestamp(seconds_since_epoch)
+
 
 def list2str(list1, sep=",", enquote=False):
     s = ""

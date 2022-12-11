@@ -69,9 +69,12 @@ class OnMemGetter(DataGetter):
 
             starti = self.getIndex(startep)
             endi = self.getIndex(endep)
-            return (ep[starti:endi+1], dt[starti:endi+1], 
-                o[starti:endi+1], h[starti:endi+1], 
-                l[starti:endi+1], c[starti:endi+1], v[starti:endi+1])
+            if starti == 0 and endi == -1:
+                return (ep, dt, o, h, l, c, v)
+            else:
+                return (ep[starti:endi+1], dt[starti:endi+1], 
+                    o[starti:endi+1], h[starti:endi+1], 
+                    l[starti:endi+1], c[starti:endi+1], v[starti:endi+1])
             
             
         child_startep = 0
@@ -143,6 +146,8 @@ class OnMemGetter(DataGetter):
         ep = self.ep
         for i in range(len(ep)):
             if ep[i] > epoch:
+                if i == 0:
+                    return 0
                 return i-1
         return -1
 

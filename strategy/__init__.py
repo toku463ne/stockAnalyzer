@@ -2,6 +2,16 @@ from event.order import OrderEvent
 from consts import *
 
 class Strategy(object):
+    def initAttrFromArgs(self, args, name, default=None):
+        if name in args.keys():
+            setattr(self, name, args[name])
+        elif default is None:
+            raise Exception("%s is necessary!" % name)
+        else:
+            setattr(self, name, default)
+        
+
+
     # return list of order_events
     def onTick(self, epoch):
         pass

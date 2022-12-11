@@ -2,6 +2,23 @@ BLOCK_SIZE = 10000
 BUFFER_BARS = 10
 import env
 
+def getPrices(codename, granularity, startep, endep):
+    dg = None
+    for ds in env.conf["data_sources"]:
+        if ds == "yf":
+            import data_getter.yfinance_getter
+            dg = data_getter.yfinance_getter.YFinanceGetter(codename, granularity)
+        if ds == "mydf":
+            import data_getter.mydf_getter
+            dg = data_getter.mydf_getter.MyDfGetter(dg)
+        if ds == "mysql":
+            import data_getter.my_getter
+            dg = data_getter.my_getter.MyGetter(dg)
+    
+    (ep, dt, o, h, l, c, v) = dg.getPrices(startep, endep)
+    return (ep, dt, o, h, l, c, v)
+
+
 def getDataGetter(codename, granularity, is_dgtest=False):
     dg = None
     for ds in env.conf["data_sources"]:

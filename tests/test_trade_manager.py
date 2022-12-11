@@ -1,3 +1,4 @@
+import __init__
 import unittest
 import lib
 from trade_manager import TradeManager

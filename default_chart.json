@@ -1,8 +1,8 @@
 {
     "codename": "^N225",
     "granularity": "D",
-    "start_date": "2021-10-01",
-    "end_date": "2021-12-01",
+    "start_date": "2021-11-01",
+    "end_date": "2022-04-01",
     "indicators": {
         "sma20": {
             "span": 20,
@@ -17,7 +17,7 @@
     },
     "backtest": {
         "commission": 100,
-        "stop_order_date": "2021-11-20",
+        "stop_order_date": "2022-03-20",
         "strategy": {
             "name": "SimpleMarketStrategy",
             "args": {

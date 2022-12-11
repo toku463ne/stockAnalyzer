@@ -28,6 +28,11 @@ class TestSimpleMarketStrategy(unittest.TestCase):
 
 
     def testCase1(self):
+        st = lib.str2epoch("2021-10-01T00:00:00")
+        ed = lib.str2epoch("2021-12-01T00:00:00")
+        os = lib.str2epoch("2021-11-20T00:00:00")
+        report = self._run(st, ed, os, 500)
+        self.assertEqual(len(report),11)
         
         st = lib.str2epoch("2021-06-01T00:00:00")
         ed = lib.str2epoch("2021-12-01T00:00:00")

@@ -1,0 +1,8 @@
+{
+    "name": "SimpleMarketStrategy",
+    "args": {
+        "profit": 500,
+        "codename": "^N225",
+        "granularity": "D"
+    }
+}
