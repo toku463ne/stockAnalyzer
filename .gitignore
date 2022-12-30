@@ -1,4 +1,5 @@
 *.pyc
 *__pycache__
+tests/test_zzStats.d/*
 bk
 old*

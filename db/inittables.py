@@ -58,7 +58,7 @@ def prepareJPXTables():
     sql = "delete from codes where source = 'jpx';"
     db.execSql(sql)
 
-    sql = """insert into codes(codename, name, source, market, market_detail, market_type)
+    sql = """insert into codes(codename, name, source, market, market_detail, market_type, industry33_code)
 select distinct concat(コード, '.T') as codename, 
 銘柄名 as name, 
 'jpx' as source, 
@@ -84,7 +84,8 @@ case
     when 市場・商品区分 = 'プライム（内国株式）' then 'domestic'
     when 市場・商品区分 = 'プライム（外国株式）' then 'overseas'
     else 'other'
-end as market_type
+end as market_type,
+`33業種コード` as industry33_code
 from jpx_raw;"""
     db.execSql(sql)
     
@@ -96,6 +97,13 @@ from jpx_raw;"""
         for code in data.keys():
             cols = ["codename", "source"]
             vals = ["'%s'" % code, "'manual'"]
+            for col in data[code].keys():
+                cols.append(col)
+                vals.append("'%s'" % data[code][col])
+
+            """
+            cols = ["codename", "source"]
+            vals = ["'%s'" % code, "'manual'"]
             if "name" in data[code].keys():
                 cols.append("name")
                 vals.append("'%s'" % data[code]["name"])
@@ -105,10 +113,11 @@ from jpx_raw;"""
             if "market_type" in data[code].keys():
                 cols.append("market_type")
                 vals.append("'%s'" % data[code]["market_type"])
-            
+            """
+
             sql = "insert into %s(%s) values(%s);" % ("codes", ",".join(cols), ",".join(vals))
             db.execSql(sql)
-            
+    print("Completed")
 
 
 if __name__ == "__main__":

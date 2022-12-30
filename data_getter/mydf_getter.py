@@ -1,6 +1,7 @@
 from http.client import REQUEST_URI_TOO_LONG
 import pandas as pd
 import lib.sqlib as sqlib
+import math
 
 from data_getter import DataGetter
 import lib.naming as naming
@@ -59,8 +60,11 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
         vals = ""
         for i in range(len(df.index)):
             s = df.iloc[i]
+            if math.isnan(s["O"]):
+                continue
             rowv = "(%i, '%s', %f, %f, %f, %f, %f)" % (s["EP"], 
             s["DT"], s["O"], s["H"], s["L"], s["C"], s["V"])
+            
             if vals == "":
                 vals = rowv
             else:

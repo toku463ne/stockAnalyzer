@@ -37,7 +37,7 @@ class Executor(object):
         
         if orderEvent.status == ESTATUS_ORDER_OPENED:
             if orderEvent.cmd == CMD_CREATE_MARKET_ORDER:
-                orderEvent.openTrade(epoch, price, "Market order")
+                orderEvent.openTrade(epoch, price, orderEvent.desc)
                 return orderEvent
                 
             elif orderEvent.cmd == CMD_CREATE_STOP_ORDER:
@@ -48,10 +48,10 @@ class Executor(object):
                     return orderEvent
                 else:
                     if side == SIDE_BUY and orderEvent.price > l:
-                        orderEvent.openTrade(epoch, price, "Stop order")
+                        orderEvent.openTrade(epoch, price, orderEvent.desc)
                         return orderEvent
                     if side == SIDE_SELL and orderEvent.price < h:
-                        orderEvent.openTrade(epoch, price, "Stop order")
+                        orderEvent.openTrade(epoch, price, orderEvent.desc)
                         return orderEvent
   
             else:

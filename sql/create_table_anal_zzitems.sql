@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS #TABLENAME# (
     zzitemid INT NOT NULL AUTO_INCREMENT,
-    zzgroupid INT NOT NULL,
+    codename VARCHAR(50),
     startep INT,
     endep INT,
-    km_groupid INT,
+    km_groupid VARCHAR(50),
     #XYCOLUMS#,
+    last_dir TINYINT,
     PRIMARY KEY(zzitemid),
-    INDEX (zzgroupid),
-    FOREIGN KEY (zzgroupid) REFERENCES anal_zzgroups(zzgroupid)
+    INDEX (codename)
 );

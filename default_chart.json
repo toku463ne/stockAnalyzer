@@ -6,13 +6,11 @@
     "indicators": {
         "sma20": {
             "span": 20,
-            "type": "sma",
-            "chart_type": "line"
+            "type": "sma"
         },
         "zigzag5": {
             "size": 5,
-            "type": "zigzag",
-            "chart_type": "line"
+            "type": "zigzag"
         }
     },
     "backtest": {

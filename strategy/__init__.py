@@ -20,8 +20,9 @@ class Strategy(object):
     def onSignal(self, epoch, event):
         pass
 
-    def createMarketOrder(self, epoch, data_getter, side, units, price,
-                        validep=0, takeprofit=0, stoploss=0, desc=""):
+    def createMarketOrder(self, epoch, data_getter, side, units,
+                        validep=0, takeprofit=0, stoploss=0, desc="Market Order"):
+        (_, price, _, _, _, _, _) = data_getter.getPrice(epoch+data_getter.unitsecs)
         order = OrderEvent(CMD_CREATE_MARKET_ORDER, data_getter, 
                           epoch=epoch, side=side,
                           units=units, price=price, validep=validep, 
@@ -29,8 +30,9 @@ class Strategy(object):
         #order.openTrade(epoch, price, desc)
         return order
     
-    def createStopOrder(self, epoch, data_getter, side, units, price,
-                        validep=0, takeprofit=0, stoploss=0, desc=""):
+    def createStopOrder(self, epoch, data_getter, side, units,
+                        validep=0, takeprofit=0, stoploss=0, desc="Stop Order"):
+        (_, price, _, _, _, _, _) = data_getter.getPrice(epoch+data_getter.unitsecs)
         order = OrderEvent(CMD_CREATE_STOP_ORDER, data_getter, 
                           epoch=epoch, side=side,
                           units=units, price=price, validep=validep, 

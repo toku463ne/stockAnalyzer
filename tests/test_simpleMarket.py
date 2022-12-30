@@ -38,24 +38,24 @@ class TestSimpleMarketStrategy(unittest.TestCase):
         ed = lib.str2epoch("2021-12-01T00:00:00")
         os = lib.str2epoch("2021-11-20T00:00:00")
         report = self._run(st, ed, os, 1000)
-        self.assertEqual(report["trade_count"], 7)
-        self.assertEqual(report["buy_offline"], -1000.0)
+        self.assertEqual(report["trade_count"], 5)
+        self.assertEqual(int(report["buy_offline"]), 292)
         
         report = self._run(st, ed, os, 700)
-        self.assertEqual(report["trade_count"], 11)
-        self.assertEqual(report["buy_offline"], 700.0)
+        self.assertEqual(report["trade_count"], 10)
+        self.assertEqual(int(report["buy_offline"]), 619)
         
         report = self._run(st, ed, os, 500)
-        self.assertEqual(report["trade_count"], 17)
-        self.assertEqual(report["sell_offline"], -500.0)
+        self.assertEqual(report["trade_count"], 18)
+        self.assertEqual(int(report["sell_offline"]), 323)
         
         st = lib.str2epoch("2021-06-01T00:00:00")
         ed = lib.str2epoch("2021-09-01T00:00:00")
         os = lib.str2epoch("2021-08-20T00:00:00")
         report = self._run(st, ed, os, 1000)
-        self.assertEqual(report["trade_count"], 5)
-        self.assertEqual(report["sell_offline"], -1000.0)
-        self.assertEqual(report["buy_offline"], -2000.0)
+        self.assertEqual(report["trade_count"], 3)
+        self.assertEqual(int(report["sell_offline"]), 28805)
+        self.assertEqual(int(report["buy_offline"]), -873)
         
 
         #print(report)

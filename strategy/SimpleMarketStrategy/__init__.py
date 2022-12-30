@@ -34,7 +34,7 @@ class SimpleMarketStrategy(Strategy):
 
         (now, _, _, h, l, c, _) = self.ticker.getPrice(epoch)
         self.now = now
-        price = (h+l+c)/3
+        price = c
 
         orders = []
         if self.id == -1:
@@ -43,7 +43,7 @@ class SimpleMarketStrategy(Strategy):
             #epoch, data_getter, side, units, price,
             #            validep=0, takeprofit=0, stoploss=0, desc=""
             order = self.createMarketOrder(now,
-                    self.ticker.dg, self.curr_side, 1, price,
+                    self.ticker.dg, self.curr_side, 1,
                     takeprofit=price+self.curr_side*self.profit, 
                     stoploss=price-self.curr_side*self.profit)
             self.localId = order.localId

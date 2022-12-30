@@ -3,6 +3,7 @@ import env
 
 def formatCodeName(codename):
     codename = codename.replace("^","").replace(".","")
+    codename = codename.replace("=X", "USD")
     return codename
 
 def priceTable(codename, granularity, tableNamePrefix=""):

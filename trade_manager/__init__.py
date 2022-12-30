@@ -33,16 +33,16 @@ class TradeManager(object):
                 order = order_events.pop(0)
                 if self.receiveOrder(epoch, order) == False:
                     strategy.onError(epoch, order)
-                
+            
+            if t.tick() == False:
+                break
+
             events = self.checkEvents(epoch)
             while len(events) > 0:
                 event = events.pop(0)
                 strategy.onSignal(epoch, event)
                 portforio.onSignal(epoch, event)
 
-            
-            if t.tick() == False:
-                break
 
         return self.getReport()
 

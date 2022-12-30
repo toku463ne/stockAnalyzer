@@ -36,3 +36,11 @@ def getJPXDf():
         return pd.read_excel(dst_file) 
     else:
         return None
+
+def getJPXDfLocal():
+    tmpdir = "%s/stockanaldata" % (env.conf["tmp_dir"])
+    dst_file = '%s/data_j.xls' % tmpdir
+    if os.path.exists(dst_file):
+        return pd.read_excel(dst_file) 
+    else:
+        return None

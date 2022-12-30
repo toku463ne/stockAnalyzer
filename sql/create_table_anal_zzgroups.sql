@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS anal_zzgroups (
-    zzgroupid INT NOT NULL AUTO_INCREMENT,
+    zzgroupid INT NOT NULL,
     codename VARCHAR(50),
     granularity VARCHAR(10),
     size INT,

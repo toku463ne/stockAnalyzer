@@ -3,14 +3,15 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from env import *
+from consts import *
 
-from re import X
 import data_getter
 from analyzer import Analyzer
 from ticker.zigzag import Zigzag
 from db.mysql import MySqlDB
 import db.mydf as mydf
 import lib
+import lib.tradelib as tradelib
 
 from sklearn.cluster import KMeans
 import pandas as pd
@@ -19,21 +20,34 @@ import json
 import matplotlib.pyplot as plt
 import math
 import pickle
+from datetime import datetime
+
+zz_buff = 10
 
 class ZzAnalyzer(Analyzer):
-    def __init__(self, granularity, n_points, kmpkl_file, zz_size=5, use_master=False):
+    def __init__(self, granularity, 
+        n_points, kmpkl_file, 
+        zz_size=5, 
+        use_master=False,
+        km_avg_size=ZZ_KM_AVG_SIZE):
         self.granularity = granularity
         self.n_points = n_points
         self.zz_size = zz_size
-        self.tableNames = ["anal_zzgroups", "anal_zzdata"]
         self.kmpkl_file = kmpkl_file
+        self.km_avg_size = km_avg_size
+        self.kms = {}
         
         self.db = MySqlDB(is_master=use_master)
         self.df = mydf.MyDf(is_master=use_master)
         
-        for t in self.tableNames:
-            if self.db.tableExists(t) == False:
-                self.db.createTable(t)
+
+        dataTableName = self.getDataTableName()
+        if self.db.tableExists(dataTableName) == False:
+            self.db.createTable(dataTableName, "anal_zzdata")
+        self.dataTableName = dataTableName
+
+        if self.db.tableExists("anal_zzcodes") == False:
+            self.db.createTable("anal_zzcodes")
 
         xys = ""
         stats_xys = ""
@@ -56,7 +70,6 @@ class ZzAnalyzer(Analyzer):
         itemTableName = self.getItemTableName()
         if self.db.tableExists(itemTableName) == False:
             self.db.createTable(itemTableName, "anal_zzitems", {"#XYCOLUMS#": xys})
-        self.tableNames.append(itemTableName)
         self.itemTable = itemTableName
 
 
@@ -65,9 +78,9 @@ class ZzAnalyzer(Analyzer):
             self.db.createTable(statsTableName, "anal_zzkmstats", {"#XYCOLUMS#": stats_xys})
         self.kmStatsTable = statsTableName
 
-        #self.groupIds = self.getGroupIds()
-
         
+    def getDataTableName(self):
+        return "anal_zzdata_%s_%d" % (self.granularity, self.n_points)
 
     def getItemTableName(self):
         return "anal_zzitems_%s_%d" % (self.granularity, self.n_points)
@@ -76,55 +89,64 @@ class ZzAnalyzer(Analyzer):
         return "anal_zzkmstats_%s_%d" % (self.granularity, self.n_points)
 
     
-    def _getGroupId(self, codename):
-        sql = """select zzgroupid from anal_zzgroups
-where
-codename = '%s'
-and granularity = '%s'
-and size = %d  
-        """ % (codename, self.granularity, self.zz_size)
-        (zzgroupid,) = self.db.select1rec(sql)
-        return zzgroupid
-
-    def getGroupId(self, codename):
-        sql = """select count(*) from anal_zzgroups
-where
-codename = '%s'
-and granularity = '%s'
-and size = %d  
-        """ % (codename, self.granularity, self.zz_size)
-        (cnt,) = self.db.select1rec(sql)
-        if cnt > 0:
-            return str(self._getGroupId(codename))
-
-        sql = """replace into anal_zzgroups(codename, granularity, size)
-values('%s', '%s', %d);
-        """ % (codename, self.granularity, self.zz_size)
-
+    def initZzCodeTable(self, year):
+        sql = "delete from anal_zzcodes where obsyear = %d" % year
         self.db.execSql(sql)
-        return self._getGroupId(codename)
+        granularity = self.granularity
 
+        insql = "insert into anal_zzcodes(codename, obsyear, market, nbars, min_nth_volume) values"
+        is_first = True
+        sql = "select codename, market from codes where (market = 'index' or industry33_code != '-');"
+        for (codename, market) in self.db.execSql(sql):
+            dg = data_getter.getDataGetter(codename, granularity)
+            startep = lib.dt2epoch(datetime(year,1,1))
+            endep = lib.dt2epoch(datetime(year,12,31))
 
-    def getItemId(self, zzgroupid, startep):
+            if market == "index":
+                if is_first == False:
+                    insql += ","
+                insql += "('%s',%d, '%s', %d, %d)" % (codename, year, market, 0, 0)
+                is_first = False
+                continue
+
+            (_,_,_,_,_,_,v) = dg.getPrices(startep, endep, waitDownload=False)
+            nbars = len(v)
+            min_v = 0
+            v.sort()
+            if nbars > ZZ_N_MIN_VOLUMES*2:
+                min_v = v[ZZ_N_MIN_VOLUMES-1]
+            elif nbars > 0:
+                min_v = v[0]
+            
+            if min_v < ZZ_MIN_VOLUMES:
+                continue
+
+            if is_first == False:
+                insql += ","
+            insql += "('%s',%d, '%s', %d, %d)" % (codename, year, market, nbars, min_v)
+            is_first = False
+        
+        self.db.execSql(insql + ";")
+
+    def getCodenamesFromDB(self, observe_year, market=""):
+        sql = "select codename from anal_zzcodes where obsyear = %d" % (observe_year)
+        if market != "":
+            sql += " and market='%s'" % market
+        codenames = []
+        for (codename,) in self.db.execSql(sql + ";"):
+            codenames.append(codename)
+        return codenames
+
+    def getItemId(self, codename, startep):
         sql = """select zzitemid from %s
 where
-zzgroupid = %d
+codename = '%s'
 and startep = %d 
-        """ % (self.itemTable,zzgroupid, startep)
+        """ % (self.itemTable,codename, startep)
         (itemid,) = self.db.select1rec(sql)
         return itemid
 
-    def getGroupIds(self, codenames, valtype="str"):
-        groupIds = []
-        for code in codenames:
-            groupId = self.getGroupId(code)
-            if valtype == "int":
-                groupId = int(groupId)
-            if valtype == "str":
-                groupId = str(groupId)
-            
-            groupIds.append(groupId)
-        return groupIds
+    
 
     def _normalizeItem(self, ep, prices):
         st = ep[0]
@@ -158,7 +180,11 @@ and startep = %d
             return (-1, -1, -1, -1, -1)
 
         vals = self._normalizeItem(ep, prices)
-        groupid = self.km.predict([vals])[0]
+        rootid = self._calcKmRootGroupId(vals)
+        kmid = 0
+        if rootid in self.kms.keys():
+            kmid = self.kms[rootid].predict([vals])[0]
+        groupid = self._getKmGroupId(rootid, kmid)
         is_first = True
         sqlcols = ""
         for i in range(len(ep)):
@@ -167,12 +193,14 @@ and startep = %d
             else:
                 is_first = False
             sqlcols += "x%d, y%d" % (i, i)
-        sql = """select count, meanx, meany, stdx, stdy, %s from %s
-where km_groupid = %d;""" % (sqlcols, self.kmStatsTable, groupid)
+        sql = """select count, lose_count, meanx, meany, stdx, stdy, %s from %s
+where km_groupid = '%s';""" % (sqlcols, self.kmStatsTable, groupid)
 
         res = self.db.select1rec(sql)
-        (cnt, meanx, meany, nstdx, nstdy) = res[:5]
-        points = res[5:]
+        if res == None:
+            return None
+        (cnt, lose_cnt, meanx, meany, nstdx, nstdy) = res[:6]
+        points = res[6:]
 
         xs = []
         ys = []
@@ -183,26 +211,26 @@ where km_groupid = %d;""" % (sqlcols, self.kmStatsTable, groupid)
         gapx = ep[-1] - ep[0]
         gapy = max(prices) - min(prices)
 
-        (cnt, x, y, stdx, stdy) = (cnt, 
+        (x, y, stdx, stdy) = ( 
             ep[0] + gapx*meanx, 
             min(prices) + gapy*meany, 
             gapx*nstdx, 
             gapy*nstdy)
-        return (cnt, x, y, stdx, stdy, nstdx, nstdy)
+        return (cnt, lose_cnt, x, y, stdx, stdy, nstdx, nstdy, groupid)
 
 
-    def _registerItem(self, zzgroupid, ep, prices):
+    def _registerItem(self, codename, ep, prices, dirs):
         st = ep[0]
         ed = ep[-1]
         
         sql = """select count(*) from %s
 where
-zzgroupid = %d
+codename = '%s'
 and startep = %d 
-        """ % (self.itemTable, zzgroupid, st)
+        """ % (self.itemTable, codename, st)
         (cnt,) = self.db.select1rec(sql)
         if cnt > 0:
-            return self.getItemId(zzgroupid, st)
+            return self.getItemId(codename, st)
 
         sqlcols = ""
         sqlvals = ""
@@ -224,18 +252,20 @@ and startep = %d
             sqlvals += "%f, %f" % (x, y)
             
 
-        sql = """insert into %s(zzgroupid, startep, endep, %s) 
-    values(%d, %d, %d, %s);
-                """ % (self.itemTable, sqlcols, zzgroupid, st, ed, sqlvals)
+        sql = """insert into %s(codename, startep, endep, %s, last_dir) 
+    values('%s', %d, %d, %s, %d);
+                """ % (self.itemTable, sqlcols, codename, st, ed, sqlvals, dirs[-2])
 
         self.db.execSql(sql)
-        zzitemid = self.getItemId(zzgroupid, st)
+        zzitemid = self.getItemId(codename, st)
 
         return zzitemid
 
 
     def registerData(self, startep, endep, codenames):
         granularity = self.granularity
+        unitsecs = tradelib.getUnitSecs(granularity)
+        buff_ep = unitsecs*zz_buff
         first = True
 
         """
@@ -246,16 +276,23 @@ and startep = %d
         for codename in codenames:
             log("Processing %s" % codename)
 
-            zzgroupid = int(self.getGroupId(codename))
-            sql = "select startep, endep from %s where "
-
+            sql = """select min(ep) startep, max(ep) endep from 
+%s where codename = '%s';""" % (self.dataTableName, codename)
+            res = self.db.select1rec(sql)
+            if res != None:
+                (cstartep, cendep) = res
+                if cstartep != None and cendep != None and (cstartep - buff_ep <= startep) and (cendep + buff_ep >= endep):
+                    continue
 
             dg = data_getter.getDataGetter(codename, granularity)
-            if first:
-                ohlcv = dg.getPrices(startep, endep, waitDownload=False)
-                first = False
-            else:
-                ohlcv = dg.getPrices(startep, endep, waitDownload=True)
+            try:
+                if first:
+                    ohlcv = dg.getPrices(startep, endep, waitDownload=False)
+                    first = False
+                else:
+                    ohlcv = dg.getPrices(startep, endep, waitDownload=True)
+            except Exception as e:
+                log("codename=%s\n%s" % (codename, e))
             zz = Zigzag(codename, granularity, startep, endep)
 
             if len(zz.ep) < self.n_points:
@@ -263,27 +300,61 @@ and startep = %d
 
             zz.initData(ohlcv, self.zz_size)    
             
-            ep = zz.zz_ep
-            dt = zz.zz_dt
-            prices = zz.zz_prices
+            ep = zz.ep
+            zz_idx = zz.tick_indexes
+            zz_ep = zz.zz_ep
+            zz_dt = zz.zz_dt
+            zz_prices = zz.zz_prices
+            zz_dirs = zz.zz_dirs
+            zz_dists = zz.zz_dists
 
-            for i in range(len(ep)):
-                sql = "replace into anal_zzdata(zzgroupid, EP, DT, P) values(%s, %d, '%s', %f);" % (zzgroupid, ep[i], dt[i], prices[i])
+            for i in range(len(zz_ep)):
+                sql = """replace into 
+%s(codename, EP, DT, P, dir, dist) 
+values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename, 
+                zz_ep[i], zz_dt[i], zz_prices[i], zz_dirs[i], zz_dists[i])
                 self.db.execSql(sql)
 
             n_points = self.n_points
-            for i in range(n_points-1, len(ep)):
-                self._registerItem(zzgroupid, 
-                    ep[i-n_points+1:i+1], 
-                    prices[i-n_points+1:i+1])
+            i = 0
+            f_ep = []
+            f_prices = []
+            f_dirs = []
+            len_zz_ep = len(zz_ep)
+            while i < len_zz_ep-2:
+                if abs(zz_dirs[i]) == 2:
+                    f_ep.append(zz_ep[i])
+                    f_prices.append(zz_prices[i])
+                    f_dirs.append(zz_dirs[i])
+                
+                    if len(f_ep) == n_points -2:
+                        j = i + 2
+                        last_ep = 0
+                        last_price = 0
+                        last_dir = 0
+                        while j<len_zz_ep:
+                            if abs(zz_dirs[j]) == 2:
+                                last_ep = zz_ep[j]
+                                last_price = zz_prices[j]
+                                last_dir = zz_dirs[j]
+                                break
+                            j += 1
+                        if last_ep == 0:
+                            break
 
+                        self._registerItem(codename, 
+                            f_ep + [zz_ep[i+1]] + [last_ep], 
+                            f_prices + [zz_prices[i+1]] + [last_price], 
+                            f_dirs + [zz_dirs[i+1]] + [last_dir])
+                        f_ep.pop(0)
+                        f_prices.pop(0)
+                i +=1
         log("Zigzab registration completed!")
 
-    def execKmeans(self, startep, endep, codenames, reqGroupIds=[]):
+    def execKmeans(self, startep, endep, codenames):
         log("Starting kmeans calculation")
 
-        groupIds = self.getGroupIds(codenames)
-
+        
         '''
         df: index:  zzitemid
             values: x1,y1, x2,y2, ...
@@ -292,50 +363,106 @@ and startep = %d
         for i in range(self.n_points-1):
             sql += ", x%d, y%d" % (i, i)
         
-        sql += " from %s where zzgroupid in (%s)" % (self.itemTable, 
-            ",".join(groupIds))
+        sql += " from %s where codename in ('%s')" % (self.itemTable, 
+            "','".join(codenames))
         
         sql += " and startep >= %d and endep <= %d" % (startep, endep)
 
-        if len(reqGroupIds) > 0:
-            sql += " and zzgroupid in (%s)" % (",".join(reqGroupIds))
-
+        
         df = pd.read_sql(sql, self.df.getConn())
         zzitemids = df["zzitemid"].tolist()
         del df["zzitemid"]
 
         log("Starting km_groupid calculation")
 
-        k = 6 ** (self.n_points-1)
-        self._updateKmGroupId(k, zzitemids, df, "km_groupid")
+        #k = 3 ** (self.n_points-1)
+        self._updateKmGroupId(zzitemids, df, "km_groupid")
 
         log("Completed!")
 
-    
-    def _updateKmGroupId(self, k, zzitemids, df, column_name):
-        k = min(int(len(df)/2), k)
-        km = KMeans(n_clusters=k)
+    def _calcKmRootGroupId(self, v):
+        n1 = self.n_points-3
+        n2 = self.n_points-4
+        g = [0]*(n1 + n2)
+        for j in range(n1):
+            l = j*2+1
+            d = v[l+2*2]-v[l]
+            b = "0"
+            if abs(d) < 0.01:
+                b = "0"
+            elif d > 0:
+                b = "1"
+            else:
+                b = "2"
+            g[j] = b
+        for j in range(n2):
+            l = j*2+1
+            d = v[l+3*2]-v[l]
+            b = "0"
+            if abs(d) < 0.01:
+                b = "0"
+            elif d > 0:
+                b = "1"
+            else:
+                b = "2"
+            g[n1+j] = b
+        gid = "".join(g)
+        return gid
+
+    def _getKmGroupId(self, rootid, kmid):
+        return "%s-%s" % (rootid, str(kmid).zfill(10))
+
+    def _getKmpklFilename(self, rootid):
+        return "%s_%s" % (self.kmpkl_file, rootid)
+
+    def _updateKmGroupId(self, zzitemids, df, column_name):
+        root_groups = {}
+        item_groups = {}
         vals = df.values
-        km = km.fit(vals)
-        kmg = km.fit_predict(vals)
-
-        # print(kmg)
-        
-        for i in range(len(zzitemids)):
-            sql = "update %s set %s = %d where zzitemid = %d;" % (self.itemTable, 
-                    column_name, kmg[i], zzitemids[i])
-            #print(sql)
-            self.db.execSql(sql)
-
-        # save kmeans model
-        with open(self.kmpkl_file, "wb") as f:
-            pickle.dump(km, f)
-        self.km = km
+        for i in range(len(vals)):
+            v = vals[i]
+            gid = self._calcKmRootGroupId(v)
+            if gid not in root_groups.keys():
+                root_groups[gid] = []
+                item_groups[gid] = []
+            root_groups[gid].append(v)
+            item_groups[gid].append(zzitemids[i])
+            
+        for gid in root_groups.keys():
+            vals = root_groups[gid]
+            k = int(len(vals)/self.km_avg_size)
+            if k > 1:
+                km = KMeans(n_clusters=k)
+                km = km.fit(vals)
+                kmg = km.fit_predict(vals)
+                # save kmeans model
+                pklfile = self._getKmpklFilename(gid)
+                with open(pklfile, "wb") as f:
+                    pickle.dump(km, f)
+            else:
+                kmg = [0]*len(vals)
+            
+            item_group = item_groups[gid]
+            for i in range(len(item_group)):
+                sql = "update %s set %s = '%s' where zzitemid = %d;" % (self.itemTable, 
+                        column_name, self._getKmGroupId(gid, kmg[i]), item_group[i])
+                #print(sql)
+                self.db.execSql(sql)
+            
+        #self.km = km
 
     def loadKmModel(self):
         # to load
-        self.km = pickle.load(open(self.kmpkl_file, "rb"))
-
+        sql = "select km_groupid from %s;" % (self.kmStatsTable)
+        for (groupid,) in self.db.execSql(sql):
+            a = groupid.split("-")
+            rootid = a[0]
+            kmf = self._getKmpklFilename(rootid)
+            if os.path.exists(kmf):
+                with open(kmf, "rb") as f:
+                    self.kms[rootid] = pickle.load(f)
+            
+            
 
     def calcClusterStats(self):
         mxy = ""
@@ -355,26 +482,37 @@ and startep = %d
             cxy += "%s, %s" % (x, y)
 
         sql = """insert into 
-%s(`km_groupid`, `count`, `meanx`, `meany`, `stdx`, `stdy`, `last_epoch`, %s)         
-(select km_groupid, 
-count(km_groupid) c, 
-avg(x%d) mx, avg(y%d) my, std(x%d) sx, std(y%d) sy, 
-max(endep) last_epoch, %s  
-FROM %s item1
-inner join (
-select min(zzitemid) zzitemid, startep from %s group by startep, km_groupid
-) as item2 on item1.zzitemid = item2.zzitemid 
-where km_groupid is not null
-group by km_groupid
-) on duplicate key update 
+%s(`km_groupid`, `count`, `lose_count`, `meanx`, `meany`, `stdx`, `stdy`, `last_epoch`, %s)         
+(
+    select item1.km_groupid, cnt, ifnull(lose_cnt,0), mx, my, sx, sy, last_epoch, %s
+    from
+    (
+        select km_groupid, count(zzitemid) cnt, 
+        avg(x%d) mx, avg(y%d) my, std(x%d) sx, std(y%d) sy,
+        max(endep) last_epoch, %s  
+        from %s
+        where km_groupid is not null
+        group by km_groupid
+    ) item1
+    left join
+    (
+        select km_groupid, count(zzitemid) lose_cnt from %s 
+        where abs(last_dir) = 1
+        group by km_groupid
+    ) item2 on item1.km_groupid = item2.km_groupid
+
+)
+on duplicate key update 
 `count` = values(`count`),
+`lose_count` = values(`lose_count`),
 `meanx` = values(`meanx`),
 `meany` = values(`meany`),
 `stdx` = values(`stdx`),
 `stdy` = values(`stdy`),
 `last_epoch` = values(`last_epoch`),
 %s
-;""" % (self.kmStatsTable, cxy, 
+;""" % (self.kmStatsTable, cxy,
+        cxy, 
         self.n_points-1, self.n_points-1, self.n_points-1, self.n_points-1, 
         mxy, 
         self.itemTable, 
@@ -385,7 +523,7 @@ group by km_groupid
 
 
 
-    def plotTopClusters(self, min_size=20):
+    def plotTopClusters(self, min_size=10):
         sql = """select km_groupid, 
 count(km_groupid) km2cnt, avg(y%d) m, std(y%d) s  
 FROM %s
@@ -421,10 +559,9 @@ limit 12
 
         i = 0
         for grpid2 in cls.keys():
-            sql = """select grp.codename, startep, endep, %s, %s from 
+            sql = """select codename, startep, endep, %s, %s from 
 %s as item 
-left join anal_zzgroups grp on item.zzgroupid = grp.zzgroupid
-where km_groupid = %d;""" % (",".join(xs), 
+where km_groupid = '%s';""" % (",".join(xs), 
     ",".join(ys), 
     self.itemTable, grpid2)
 
@@ -442,7 +579,7 @@ where km_groupid = %d;""" % (",".join(xs),
 
                 ax.plot(x, y, label=legend)
                 #ax.legend()
-                ax.set_title("groupid=%d count=%d \nmean=%f std=%f" % (grpid2, 
+                ax.set_title("groupid=%s count=%d \nmean=%f std=%f" % (grpid2, 
                     cls[grpid2]["count"], cls[grpid2]["m"], cls[grpid2]["s"]))
             i += 1
 
@@ -454,7 +591,6 @@ def run(jsonfile="anal_zz_conf.json", stage="all"):
     with open("%s/%s" % (env.BASE_DIR, jsonfile), "r") as f:
         data = json.load(f)
 
-    codenames = data["codenames"]
     n_points = data["n_points"]
     granularity = data["granularity"]
 
@@ -472,6 +608,18 @@ def run(jsonfile="anal_zz_conf.json", stage="all"):
     kmpkl_file = "%s/%s" % (work_dir, data["kmpkl_file"])
     a = ZzAnalyzer(granularity, n_points, kmpkl_file)
     
+    year = datetime.now().year
+    if "observe_year" in data.keys():
+        year = data["observe_year"]
+    if stage == "all" or stage == "init":
+        a.initZzCodeTable(year)
+
+    codenames = []
+    if "codenames" in data.keys():
+        codenames = data["codenames"]
+    else:
+        codenames = a.getCodenamesFromDB(year)
+
     if stage == "all" or stage == "zigzag":
         a.registerData(startep, endep, codenames)
     
@@ -485,8 +633,8 @@ def run(jsonfile="anal_zz_conf.json", stage="all"):
         a.plotTopClusters()
 
 if __name__ == "__main__":
-    run()
+    #run()
     #run(stage="init")
-    #run(stage="zigzag")
+    run(stage="zigzag")
     #run(stage="kmeans")
     #run(stage="kmstats")

@@ -209,7 +209,7 @@ function getSbSeries(chart) {
   return sbSeries;
 }
 
-function getLineSeries(name, chart, xaxis, yaxis, data) {
+function setLineSeries(name, chart, xaxis, yaxis, data) {
   var series = chart.series.push(am5xy.LineSeries.new(root, {
     name: name,
     xAxis: xaxis,
@@ -227,16 +227,62 @@ function getLineSeries(name, chart, xaxis, yaxis, data) {
     //dateFormat: "yyyy-MM-dd",
     numericFields: [name]
   });
+  processor.processMany(data);
+    series.data.setAll(data);
+    let valueTooltip = series.set("tooltip", am5.Tooltip.new(root, {
+      getFillFromSprite: false,
+      getStrokeFromSprite: true,
+      getLabelFillFromSprite: true,
+      autoTextColor: false,
+      pointerOrientation: "horizontal",
+      labelText: "{name}: {valueY}"
+    }));
+  valueTooltip.get("background") .set("fill", root.interfaceColors.get("background"));
   return [series];
+}
+
+function setScatterSeries(name, chart, xaxis, yaxis, data) {
+  var color = 0x3386FF //blue
+  var series = chart.series.push(am5xy.LineSeries.new(root, {
+    calculateAggregates: true,
+    xAxis: xaxis,
+    yAxis: yaxis,
+    valueYField: name,
+    valueXField: "Date",
+    tooltip: am5.Tooltip.new(root, {
+      labelText: "x: {valueX} y:{valueY}"
+    })
+  }));
+
+  var bullet = series.bullets.push(function() {
+      var circle = am5.Circle.new(root, {
+        radius: 2,
+        fill: am5.color(color),
+        stroke: am5.color(color),
+        strokeWidth: 1
+      })
+
+      return am5.Bullet.new(root, {
+        sprite: circle
+      })
+    }
+  )
+
+  series.strokes.template.set("strokeOpacity", 0);
+  series.data.setAll(data);
 }
 
 function setIndicatorSeries(name, chart, xaxis, yaxis, data) {
   switch(data["chart_type"]){
     case "line":
-      series = getLineSeries(name, chart, xaxis, yaxis, data);
+      setLineSeries(name, chart, xaxis, yaxis, data["values"]);
+      break;
+    case "zigzag":
+      setLineSeries(name, chart, xaxis, yaxis, data["values"]["main"]);
+      setScatterSeries(name, chart, xaxis, yaxis, data["values"]["middle"]);
       break;
   }
-
+  /*
   for (let i=0; i<series.length; i++) {
     processor.processMany(data["values"]);
     series[i].data.setAll(data["values"]);
@@ -250,6 +296,7 @@ function setIndicatorSeries(name, chart, xaxis, yaxis, data) {
     }));
     valueTooltip.get("background") .set("fill", root.interfaceColors.get("background"));
   }
+  */
 } 
 
 function setBacktestSeries(chart, xaxis, yaxis, data) {

@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS #TABLENAME# (
     `market` VARCHAR(50),
     `market_detail` VARCHAR(100),
     `market_type` VARCHAR(50),
+    `industry33_code` VARCHAR(50) DEFAULT '-',
     PRIMARY KEY(codename)
 );

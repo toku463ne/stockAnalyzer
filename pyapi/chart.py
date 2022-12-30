@@ -54,14 +54,17 @@ class Chart(object):
         for indicator_name in data["indicators"].keys():
             indicator = data["indicators"][indicator_name]
             ind_type = indicator["type"]
+            chart_type = "line"
             if ind_type == "sma":
                 values = ele.get_sma_chart_values(indicator_name, ep, c, int(indicator["span"]))
             if ind_type == "zigzag":
+                chart_type = "zigzag"
                 values = ele.get_zigzag_chart_values(indicator_name, ep, 
                     dt, h, l, int(indicator["size"]))
 
+            indicator["chart_type"] = chart_type
+            indicator["values"] = values
 
-            indicator["values"] = values    
             data["indicators"][indicator_name] = indicator
 
         #print(data)

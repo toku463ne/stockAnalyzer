@@ -1,3 +1,6 @@
 {
-    "^N225": {"name": "Nikkei 225", "market": "index", "market_type": "domestic"}
+    "^N225": {"name": "Nikkei 225", "market": "index", "market_type": "domestic"},
+    "^GSPC": {"name": "S&P 500", "market": "index", "market_type": "america"},
+    "^DJI": {"name": "Dow Jones Industrial Average", "market": "index", "market_type": "america"},
+    "JPY=X": {"name": "USD/JPY", "market": "index", "market_type": "forex"}
 }

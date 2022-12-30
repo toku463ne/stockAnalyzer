@@ -1,5 +1,5 @@
 from consts import *
-
+import lib
 import copy
 
 class Portoforio(object):
@@ -44,9 +44,12 @@ class Portoforio(object):
                 "codename": event.codename,
                 "open": {
                     "price": price,
-                    "epoch": epoch
+                    "epoch": epoch,
+                    "desc": event.desc
                     },
-                "side": side
+                "side": side,
+                "takeprofit_price": event.takeprofit_price,
+                "stoploss_price": event.stoploss_price,
                 }
             self.order_hist[orderId] = [_id]
             if side == SIDE_BUY:
@@ -61,7 +64,8 @@ class Portoforio(object):
         if status == ESTATUS_TRADE_CLOSED:
             self.trades[orderId]["close"] = {
                 "price": price,
-                "epoch": epoch
+                "epoch": epoch,
+                "desc": event.desc
             }
             diff = self.trades[orderId]["close"]["price"] - self.trades[orderId]["open"]["price"]
             order_hist = self.order_hist[orderId]
@@ -82,6 +86,11 @@ class Portoforio(object):
                     self.trades[orderId]["result"] = "win"
                 else:
                     self.trades[orderId]["result"] = "lose"
+            t = self.trades[orderId]
+            print("[%s]%s: %s-%s code=%s open=%2f close=%2f side=%d desc=%s" % (t["result"],
+                orderId, lib.epoch2str(t["open"]["epoch"], "%Y%m%d"),lib.epoch2str(epoch, "%Y%m%d"), 
+                t["codename"], t["open"]["price"], t["close"]["price"], 
+                t["side"], t["open"]["desc"]))
         self.last_hist = h
         if len(h.keys()) > 0:
             self.history[_id] = copy.deepcopy(h)
