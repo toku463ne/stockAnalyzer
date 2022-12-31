@@ -1,5 +1,7 @@
 *.pyc
 *__pycache__
+.venv
+uwsgi.ini
 tests/test_zzStats.d/*
 bk
 old*

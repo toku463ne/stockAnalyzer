@@ -1,6 +1,7 @@
 from http.client import REQUEST_URI_TOO_LONG
 import pandas as pd
 import lib.sqlib as sqlib
+import lib
 import math
 
 from data_getter import DataGetter
@@ -62,8 +63,9 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
             s = df.iloc[i]
             if math.isnan(s["O"]):
                 continue
+            dt = lib.dt2str(s["DT"], "%Y/%m/%d %H:%M:%S")
             rowv = "(%i, '%s', %f, %f, %f, %f, %f)" % (s["EP"], 
-            s["DT"], s["O"], s["H"], s["L"], s["C"], s["V"])
+            dt, s["O"], s["H"], s["L"], s["C"], s["V"])
             
             if vals == "":
                 vals = rowv
