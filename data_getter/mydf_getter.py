@@ -20,6 +20,7 @@ class MyDfGetter(DataGetter):
         self.childDG = childDG
         self.name = "mydfgetter_%s_%s" % (self.codename, self.granularity)
         self.tableName = naming.priceTable(self.codename, self.granularity, tableNamePrefix)
+        self.is_master = is_master
         self.df = mydf.MyDf(is_master=is_master)
         self.db = mysql.MySqlDB(is_master=is_master)
         if self.db.tableExists(self.tableName) == False:
@@ -43,7 +44,7 @@ values('%s', '%s', '%s')""" % (self.tableName, self.codename, self.granularity)
         if len(cols) > 0:
             strCols = ",".join(cols)
         sql = "select %s from %s %s order by EP;" % (strCols, self.tableName, strWhere)
-        df = pd.read_sql(sql, self.df.getConn())
+        df = self.df.read_sql(sql)
         return df
 
     def upsertData(self, df):

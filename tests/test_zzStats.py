@@ -28,15 +28,16 @@ class TestZzStatsStrategy(unittest.TestCase):
             "min_km_count": 5,
             "max_std": 0.3,
             "max_fund": 10000000,
-            "kmpkl_file": "tests/test_zzStats.d/km_2015-2021.pkl"}
+            "kmpkl_file": "/home/ubuntu/stockanaldata/zz/km_2015-2020.pkl"}
+        #    "kmpkl_file": "tests/test_zzStats.d/km_2015-2021.pkl"}
         
         #args["codenames"] = ["^N225", "1332.T"]
-        args["codenames"] = ""
+        args["codenames"] = []
         args["market"] = "prime"
         strategy = ZzStatsStrategy(args, use_master=True)
         ticker = TimeTicker(tradelib.getUnitSecs(granularity), st, ed)
         executor = Executor()
-        portforio = Portoforio()
+        portforio = Portoforio("zzstats_test")
         tm = TradeManager("zigzag stats strategy", ticker, strategy, executor, portforio)
         report = tm.run(orderstopep=os)
 

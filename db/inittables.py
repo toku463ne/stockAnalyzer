@@ -16,8 +16,6 @@ def initTables():
     table_names = ["group_members", 
                     "igroups", 
                     "industry", 
-                    "anal_zzdata",
-                    "anal_zzgroups",
                     "codes"]
     for table_name in table_names:
         db.dropTable(table_name)

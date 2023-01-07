@@ -11,14 +11,14 @@ import pandas as pd
 min_profit = 10000
 zz_size = 5
 n_points = 5
-min_km_count = 5
+min_km_count = 20
 max_orders = 3
 max_std = 0.3
-max_lose_rate = 0.4
+max_lose_rate = 0.3
 min_trade_len = 2
 max_fund = 100000
 min_unit = 100
-min_volume = 1000000
+min_volume = 100000
 
 class ZzStatsStrategy(Strategy):
     
@@ -49,8 +49,8 @@ class ZzStatsStrategy(Strategy):
         self.analyzer.loadKmModel()
         self.tickers = {}
         
-        
-    
+    """Todo: don't let last the trade too long    
+    """
     def onTick(self, epoch):
         granularity = self.granularity
         n_points = self.n_points
@@ -59,7 +59,8 @@ class ZzStatsStrategy(Strategy):
         
         if len(self.tickers) == 0:
             if len(self.codenames) == 0:
-                self.codenames = self.analyzer.getCodenamesFromDB(lib.epoch2dt(epoch).year, self.market)
+                self.codenames = self.analyzer.getCodenamesFromDB(lib.epoch2dt(epoch).year, 
+                    self.market, "<=")
         
             for codename in self.codenames:
                 self.tickers[codename] = Zigzag(codename, granularity, 
@@ -77,7 +78,8 @@ class ZzStatsStrategy(Strategy):
         last_dirs = []
         last_prices = []
         km_groupids = []
-        min_epoch = epoch - self.unitsecs * self.min_trade_len
+        min_epoch = epoch + self.unitsecs * self.min_trade_len
+        max_duration = self.zz_size*self.unitsecs*2
         min_cnt = self.min_km_count
 
 
@@ -125,7 +127,7 @@ class ZzStatsStrategy(Strategy):
         #df = df[df["nstdx"] <= self.max_std]
         #df = df[df["nstdy"] <= self.max_std]
         df = df[(df["lose_rate"] <= self.max_lose_rate) | (df["lose_rate"] >= 1- self.max_lose_rate)]
-        df = df[df["x"] - df["stdx"] >= min_epoch]
+        df = df[df["x"] >= min_epoch]
 
         if len(df) == 0:
             return []
@@ -151,8 +153,9 @@ class ZzStatsStrategy(Strategy):
             if fund > max_fund:
                 continue
 
-            profit = r.y - r.stdy - price
-            
+            #profit = r.y - r.stdy - price
+            profit = r.y - price
+
             if abs(profit)*unit < min_profit:
                 continue
             side = SIDE_BUY
@@ -175,12 +178,15 @@ class ZzStatsStrategy(Strategy):
                 sl = tmp
                 side *= -1
             
+            expiration = epoch + max_duration
+
             #print("create order: %s code=%s price=%2f tp=%2f sl=%2f side=%d unit=%d km=%s lose_rate=%2f" % (
             #    lib.epoch2dt(epoch), r.codename, price, tp, sl, side, unit, r.km_groupid, r.lose_rate))
             order = self.createMarketOrder(now,
                     dg, side, unit,
                     takeprofit=tp, 
                     stoploss=sl,
+                    expiration=expiration,
                     desc="km_group=%s lose_rate=%2f" % (r.km_groupid, r.lose_rate)) 
 
             orders.append(order)

@@ -1,5 +1,5 @@
-#!/bin/basy
+#!/bin/bash
 
-sudo service mysql start
+#sudo service mysql start
 
 python3 db/inittables.py

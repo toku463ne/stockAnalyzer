@@ -4,7 +4,7 @@ import random
 class OrderEvent(object):
     def __init__(self, cmd, data_getter, _id=-1, epoch=0, side=0, 
                  units=0, validep=0,
-        price=0, takeprofit=0, stoploss=0, desc=""):
+        price=0, takeprofit=0, stoploss=0, expiration=0, desc=""):
         self.dg = data_getter
         self.id= _id
         self.localId = "%d-%d" % (epoch, random.randint(10000000, 99999999))
@@ -22,7 +22,9 @@ class OrderEvent(object):
         self.status = ESTATUS_ORDER_OPENED
         self.takeprofit_price = takeprofit
         self.stoploss_price = stoploss
+        self.expiration = expiration
         self.desc = desc
+        self.elapsed = 0
         
         self.order_close_time = 0
         

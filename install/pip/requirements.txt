@@ -1,3 +1,4 @@
+wheel
 pymysql
 yfinance
 pandas_datareader
@@ -7,8 +8,9 @@ sqlalchemy
 falcon
 xlrd
 path
-sklearn
+scikit-learn
 matplotlib
 jupyter
 pyopenssl
 gunicorn
+tzlocal

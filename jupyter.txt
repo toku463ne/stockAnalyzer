@@ -1,0 +1,7 @@
+jupyter notebook --generate-config
+
+vim /home/ubuntu/.jupyter/jupyter_notebook_config.py
+---
+c.NotebookApp.allow_origin = 'http://52.69.203.59:8889'
+c.NotebookApp.allow_remote_access = True
+

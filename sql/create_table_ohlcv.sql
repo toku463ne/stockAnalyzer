@@ -5,6 +5,6 @@ CREATE TABLE IF NOT EXISTS #TABLENAME# (
     H FLOAT,
     L FLOAT,
     C FLOAT,
-    V INT,
+    V BIGINT,
     PRIMARY KEY (EP)
 );

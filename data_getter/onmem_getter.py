@@ -69,7 +69,7 @@ class OnMemGetter(DataGetter):
 
             starti = self.getIndex(startep)
             endi = self.getIndex(endep)
-            if starti == 0 and endi == -1:
+            if starti <= 0 and endi == -1:
                 return (ep, dt, o, h, l, c, v)
             else:
                 return (ep[starti:endi+1], dt[starti:endi+1], 
@@ -144,6 +144,10 @@ class OnMemGetter(DataGetter):
         if epoch in self.indexes.keys():
             return self.indexes[epoch]
         ep = self.ep
+        if len(ep) == 0:
+            return -1
+        if ep[0] > epoch + self.unitsecs:
+            return -1
         for i in range(len(ep)):
             if ep[i] > epoch:
                 if i == 0:

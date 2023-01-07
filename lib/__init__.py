@@ -1,13 +1,12 @@
 # Do NOT import env
-import datetime, calendar, time, pytz
+import datetime, calendar, time, pytz, tzlocal
 import os
 import math
 import numpy as np
 unix_epoch = np.datetime64(0, 's')
 one_second = np.timedelta64(1, 's')
-    
 
-DEFAULT_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+from consts import *    
 
 def epoch2dt(epoch):
     d = datetime.datetime.utcfromtimestamp(epoch)
@@ -19,7 +18,8 @@ def dt2epoch(gmdt):
 
 def str2dt(strgmdt, format=DEFAULT_DATETIME_FORMAT):
     d = datetime.datetime.strptime(strgmdt, format)
-    d = pytz.utc.localize(d)
+    if format[-2:] != "%z":
+        d = d.replace(tzinfo=tzlocal.get_localzone())
     return d
     
 def str2epoch(strgmdt, format=DEFAULT_DATETIME_FORMAT):

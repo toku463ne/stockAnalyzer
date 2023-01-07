@@ -5,16 +5,17 @@ mysql:
   test_db: stockanalyzer_test
   user: stockuser
   password: stockpass
+  conn_retry: 5
 
 data_sources:
   - yf
   - mysql
   - onmem
 
-data_download_interval: 10
+data_download_interval: 3
 
 pyapi:
   host: localhost
-  port: 9000
+  port: 9001
 
 tmp_dir: /tmp

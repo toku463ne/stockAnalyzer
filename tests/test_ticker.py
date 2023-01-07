@@ -1,16 +1,17 @@
 import unittest
 import __init__
-from ticker.ticker import Ticker
-import ticker.ticker as ticker
+from ticker import Ticker
+import ticker
 from datetime import datetime
 import pandas as pd
+from consts import *
 
 class TestTicker(unittest.TestCase):
     def test_ticker(self):
         st = datetime(year=2021, month=11, day=1).timestamp()
         ed = datetime(year=2021, month=12, day=1).timestamp()
         
-        t = Ticker("MSFT", "D", st, ed)
+        t = Ticker("^N225", "D", st, ed, buffNbars=0)
         self.assertTrue(t.tick())
         (ep, dt, o, h, l, c, v) = t.data
         self.assertEqual(pd.to_datetime(dt).day, 1)
@@ -35,7 +36,7 @@ class TestTicker(unittest.TestCase):
         self.assertTrue(t.tick(ep - t.unitsecs*4))
         (ep_err, dt, o, h, l, c, v) = t.data
         self.assertEqual(ep_err, 0)
-        self.assertEqual(t.err, ticker.ERR_NODATA)
+        self.assertEqual(t.err, TICKER_NODATA)
         
 
         self.assertTrue(t.tick(ep + t.unitsecs*26))
@@ -46,7 +47,7 @@ class TestTicker(unittest.TestCase):
         self.assertFalse(t.tick())
         (ep, dt, o, h, l, c, v) = t.data
         self.assertEqual(ep, 0)
-        self.assertEqual(t.err, ticker.ERR_EOF)
+        self.assertEqual(t.err, TICKER_ERR_EOF)
         
 
 

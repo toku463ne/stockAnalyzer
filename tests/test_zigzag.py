@@ -5,24 +5,25 @@ from datetime import datetime
 import pandas as pd
 import ticker
 from consts import *
+import lib
 
 class TestZigzag(unittest.TestCase):
     def test_zigzag(self):
-        st = datetime(year=2022, month=6, day=1, hour=9).timestamp()
-        ed = datetime(year=2022, month=11, day=1, hour=9).timestamp()        
+        st = lib.dt2epoch(datetime(year=2022, month=6, day=1, hour=9))
+        ed = lib.dt2epoch(datetime(year=2022, month=11, day=1, hour=9))
         t = Zigzag("2160.T", "D", st, ed, size=5)
+        self.assertEqual(t.zz_dt[3].month, 7)
+        self.assertEqual(t.zz_dt[3].day, 4)
+        self.assertEqual(t.zz_dirs[3], -2)
         self.assertEqual(t.zz_dt[4].month, 7)
-        self.assertEqual(t.zz_dt[4].day, 4)
-        self.assertEqual(t.zz_dirs[4], -2)
-        self.assertEqual(t.zz_dt[5].month, 7)
-        self.assertEqual(t.zz_dt[5].day, 11)
-        self.assertEqual(t.zz_dirs[5], 1)
+        self.assertEqual(t.zz_dt[4].day, 11)
+        self.assertEqual(t.zz_dirs[4], 1)
+        self.assertEqual(t.zz_dt[8].month, 8)
+        self.assertEqual(t.zz_dt[8].day, 12)
+        self.assertEqual(t.zz_dirs[8], -1)
         self.assertEqual(t.zz_dt[9].month, 8)
-        self.assertEqual(t.zz_dt[9].day, 12)
-        self.assertEqual(t.zz_dirs[9], -1)
-        self.assertEqual(t.zz_dt[10].month, 8)
-        self.assertEqual(t.zz_dt[10].day, 16)
-        self.assertEqual(t.zz_dirs[10], 2)
+        self.assertEqual(t.zz_dt[9].day, 16)
+        self.assertEqual(t.zz_dirs[9], 2)
         
 
         st = datetime(year=2022, month=9, day=1, hour=9).timestamp()
@@ -39,7 +40,7 @@ class TestZigzag(unittest.TestCase):
         self.assertEqual(t.zz_dirs[7], 1)
         self.assertEqual(t.zz_dt[8].month, 11)
         self.assertEqual(t.zz_dt[8].day, 11)
-        self.assertEqual(t.zz_dirs[8], 2)
+        self.assertEqual(t.zz_dirs[8], 1)
         
         
         st = datetime(year=2021, month=2, day=1, hour=9).timestamp()

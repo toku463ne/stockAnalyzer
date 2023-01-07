@@ -18,6 +18,8 @@ class TradeManager(object):
         strategy = self.strategy
         portforio = self.portforio
         
+        portforio.clearDB()
+        
         t = self.timeTicker
         while True:
             epoch = t.epoch
@@ -43,7 +45,7 @@ class TradeManager(object):
                 strategy.onSignal(epoch, event)
                 portforio.onSignal(epoch, event)
 
-
+        portforio.insertResult2DB()
         return self.getReport()
 
 

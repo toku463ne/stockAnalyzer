@@ -1,4 +1,4 @@
-from ticker.tick import Ticker
+from ticker import Ticker
 import lib.indicators as libind
 
 
@@ -7,7 +7,7 @@ class SMA(Ticker):
         (ep, dt, _, _, _, p, _) = ohlcv
         x, start_i = libind.sma(p, span)
         self.p = x
-        self.ep = ep[start_i:].tolist()
+        self.ep = ep[start_i:]
         self.dt = dt[start_i:]
         self.span = span
         

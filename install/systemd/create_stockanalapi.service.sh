@@ -24,6 +24,7 @@ NotifyAccess=all
 
 # Main process
 ExecStart=$(pwd)/.venv/bin/uwsgi -c $(pwd)/uwsgi.ini
+#ExecStart=/usr/bin/python3 $(pwd)/pyapi/app.py
 
 [Install]
 WantedBy=multi-user.target

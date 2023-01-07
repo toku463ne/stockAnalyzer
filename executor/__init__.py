@@ -30,6 +30,7 @@ class Executor(object):
         side = orderEvent.side
         price = (h+l+c)*1.0/3.0
         orderEvent.price = price
+        expr = orderEvent.expiration
 
         if orderEvent.cmd == CMD_CANCEL:
             self.executor.cancelOrder(epoch, orderEvent)
@@ -61,27 +62,45 @@ class Executor(object):
             tp = orderEvent.takeprofit_price
             sl = orderEvent.stoploss_price
             iswin = 0
+            expired = False
+            if expr > 0 and expr <= epoch:
+                expired = True
+            msg = ""
             
             if side == SIDE_BUY:
                 if l < sl:
                     iswin = -1
+                    msg = "stoploss"
                     price = sl 
                 elif h > tp:
                     iswin = 1
+                    msg = "takeprofit"
                     price = tp
+                elif expired:
+                    if orderEvent.trade_open_price < price:
+                        iswin = 1
+                    else:
+                        iswin = -1
+                    msg = "expired"
             if side == SIDE_SELL:
                 if h > sl:
                     iswin = -1
+                    msg = "stoploss"
                     price = sl 
                 elif l < tp:
                     iswin = 1
+                    msg = "takeprofit"
                     price = tp
+                elif expired:
+                    if orderEvent.trade_open_price > price:
+                        iswin = 1
+                    else:
+                        iswin = -1
+                    msg = "expired"
+                
             
-            if iswin == 1:
-                orderEvent.closeTrade(epoch, price, "takeprofit")
-                return orderEvent
-            if iswin == -1:
-                orderEvent.closeTrade(epoch, price, "stoploss")
+            if iswin == 1 or iswin == -1:
+                orderEvent.closeTrade(epoch, price, msg)
                 return orderEvent
         elif orderEvent.status == ESTATUS_NONE:
             if orderEvent.cmd == CMD_CREATE_MARKET_ORDER or orderEvent.cmd == CMD_CREATE_STOP_ORDER:

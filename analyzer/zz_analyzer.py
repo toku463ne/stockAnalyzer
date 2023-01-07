@@ -37,17 +37,21 @@ class ZzAnalyzer(Analyzer):
         self.km_avg_size = km_avg_size
         self.kms = {}
         
-        self.db = MySqlDB(is_master=use_master)
+        self.redb = MySqlDB(is_master=use_master)
+        self.updb = MySqlDB(is_master=use_master)
         self.df = mydf.MyDf(is_master=use_master)
         
 
         dataTableName = self.getDataTableName()
-        if self.db.tableExists(dataTableName) == False:
-            self.db.createTable(dataTableName, "anal_zzdata")
+        if self.redb.tableExists(dataTableName) == False:
+            self.updb.createTable(dataTableName, "anal_zzdata")
         self.dataTableName = dataTableName
 
-        if self.db.tableExists("anal_zzcodes") == False:
-            self.db.createTable("anal_zzcodes")
+
+        codeTableName = self.getCodeTableName()
+        if self.redb.tableExists(codeTableName) == False:
+            self.updb.createTable(codeTableName, "anal_zzcodes")
+        self.codeTableName = codeTableName
 
         xys = ""
         stats_xys = ""
@@ -68,17 +72,20 @@ class ZzAnalyzer(Analyzer):
         self.stat_xy = stat_xy
 
         itemTableName = self.getItemTableName()
-        if self.db.tableExists(itemTableName) == False:
-            self.db.createTable(itemTableName, "anal_zzitems", {"#XYCOLUMS#": xys})
+        if self.redb.tableExists(itemTableName) == False:
+            self.updb.createTable(itemTableName, "anal_zzitems", {"#XYCOLUMS#": xys})
         self.itemTable = itemTableName
 
 
         statsTableName = self.getKmStatsTableName()
-        if self.db.tableExists(statsTableName) == False:
-            self.db.createTable(statsTableName, "anal_zzkmstats", {"#XYCOLUMS#": stats_xys})
+        if self.redb.tableExists(statsTableName) == False:
+            self.updb.createTable(statsTableName, "anal_zzkmstats", {"#XYCOLUMS#": stats_xys})
         self.kmStatsTable = statsTableName
 
-        
+    def getCodeTableName(self):
+        return "anal_zzcode_%s_%d" % (self.granularity, self.n_points)
+
+
     def getDataTableName(self):
         return "anal_zzdata_%s_%d" % (self.granularity, self.n_points)
 
@@ -89,25 +96,25 @@ class ZzAnalyzer(Analyzer):
         return "anal_zzkmstats_%s_%d" % (self.granularity, self.n_points)
 
     
-    def initZzCodeTable(self, year):
-        sql = "delete from anal_zzcodes where obsyear = %d" % year
-        self.db.execSql(sql)
+    def initZzCodeTable(self, year, codenames=[]):
+        codeTableName = self.codeTableName
+        #sql = "delete from %s where obsyear = %d" % (codeTableName, year)
+        #self.updb.execSql(sql)
         granularity = self.granularity
 
-        insql = "insert into anal_zzcodes(codename, obsyear, market, nbars, min_nth_volume) values"
-        is_first = True
-        sql = "select codename, market from codes where (market = 'index' or industry33_code != '-');"
-        for (codename, market) in self.db.execSql(sql):
+        insql = "insert into %s(codename, obsyear, market, nbars, min_nth_volume) values" % (codeTableName)
+        #is_first = True
+        sql = "select codename, market from codes where (market = 'index' or industry33_code != '-')"
+        sql += """ and codename not in 
+(select codename from %s 
+where obsyear = %d)""" % (codeTableName, year)
+        if len(codenames) > 0:
+            sql += " and codename in ('%s')" % "','".join(codenames)
+        sql += ";"
+        for (codename, market) in self.redb.execSql(sql):
             dg = data_getter.getDataGetter(codename, granularity)
             startep = lib.dt2epoch(datetime(year,1,1))
             endep = lib.dt2epoch(datetime(year,12,31))
-
-            if market == "index":
-                if is_first == False:
-                    insql += ","
-                insql += "('%s',%d, '%s', %d, %d)" % (codename, year, market, 0, 0)
-                is_first = False
-                continue
 
             (_,_,_,_,_,_,v) = dg.getPrices(startep, endep, waitDownload=False)
             nbars = len(v)
@@ -118,22 +125,20 @@ class ZzAnalyzer(Analyzer):
             elif nbars > 0:
                 min_v = v[0]
             
-            if min_v < ZZ_MIN_VOLUMES:
-                continue
-
-            if is_first == False:
-                insql += ","
-            insql += "('%s',%d, '%s', %d, %d)" % (codename, year, market, nbars, min_v)
-            is_first = False
+            self.updb.execSql(insql + "('%s',%d, '%s', %d, %d)" % (codename, 
+                year, market, nbars, min_v))
+            
         
-        self.db.execSql(insql + ";")
 
-    def getCodenamesFromDB(self, observe_year, market=""):
-        sql = "select codename from anal_zzcodes where obsyear = %d" % (observe_year)
+    def getCodenamesFromDB(self, observe_year, market="", obsyear_cond="="):
+        sql = """select distinct codename from 
+%s where obsyear %s %d 
+and min_nth_volume >= %d""" % (self.codeTableName, obsyear_cond, observe_year, ZZ_MIN_VOLUMES)
         if market != "":
             sql += " and market='%s'" % market
+        sql += " order by codename;"
         codenames = []
-        for (codename,) in self.db.execSql(sql + ";"):
+        for (codename,) in self.redb.execSql(sql):
             codenames.append(codename)
         return codenames
 
@@ -143,7 +148,7 @@ where
 codename = '%s'
 and startep = %d 
         """ % (self.itemTable,codename, startep)
-        (itemid,) = self.db.select1rec(sql)
+        (itemid,) = self.redb.select1rec(sql)
         return itemid
 
     
@@ -177,9 +182,11 @@ and startep = %d
 
     def predictNext(self, ep, prices):
         if len(ep) != self.n_points-1 or len(prices) != self.n_points-1:
-            return (-1, -1, -1, -1, -1)
+            return (-1,)*9
 
         vals = self._normalizeItem(ep, prices)
+        if vals is None:
+            return (-1,)*9
         rootid = self._calcKmRootGroupId(vals)
         kmid = 0
         if rootid in self.kms.keys():
@@ -196,9 +203,9 @@ and startep = %d
         sql = """select count, lose_count, meanx, meany, stdx, stdy, %s from %s
 where km_groupid = '%s';""" % (sqlcols, self.kmStatsTable, groupid)
 
-        res = self.db.select1rec(sql)
+        res = self.redb.select1rec(sql)
         if res == None:
-            return None
+            return (-1,)*9
         (cnt, lose_cnt, meanx, meany, nstdx, nstdy) = res[:6]
         points = res[6:]
 
@@ -212,7 +219,7 @@ where km_groupid = '%s';""" % (sqlcols, self.kmStatsTable, groupid)
         gapy = max(prices) - min(prices)
 
         (x, y, stdx, stdy) = ( 
-            ep[0] + gapx*meanx, 
+            ep[-1] + gapx*meanx, 
             min(prices) + gapy*meany, 
             gapx*nstdx, 
             gapy*nstdy)
@@ -228,7 +235,7 @@ where
 codename = '%s'
 and startep = %d 
         """ % (self.itemTable, codename, st)
-        (cnt,) = self.db.select1rec(sql)
+        (cnt,) = self.redb.select1rec(sql)
         if cnt > 0:
             return self.getItemId(codename, st)
 
@@ -256,7 +263,7 @@ and startep = %d
     values('%s', %d, %d, %s, %d);
                 """ % (self.itemTable, sqlcols, codename, st, ed, sqlvals, dirs[-2])
 
-        self.db.execSql(sql)
+        self.updb.execSql(sql)
         zzitemid = self.getItemId(codename, st)
 
         return zzitemid
@@ -278,7 +285,7 @@ and startep = %d
 
             sql = """select min(ep) startep, max(ep) endep from 
 %s where codename = '%s';""" % (self.dataTableName, codename)
-            res = self.db.select1rec(sql)
+            res = self.redb.select1rec(sql)
             if res != None:
                 (cstartep, cendep) = res
                 if cstartep != None and cendep != None and (cstartep - buff_ep <= startep) and (cendep + buff_ep >= endep):
@@ -313,7 +320,7 @@ and startep = %d
 %s(codename, EP, DT, P, dir, dist) 
 values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename, 
                 zz_ep[i], zz_dt[i], zz_prices[i], zz_dirs[i], zz_dists[i])
-                self.db.execSql(sql)
+                self.updb.execSql(sql)
 
             n_points = self.n_points
             i = 0
@@ -447,21 +454,18 @@ values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename,
                 sql = "update %s set %s = '%s' where zzitemid = %d;" % (self.itemTable, 
                         column_name, self._getKmGroupId(gid, kmg[i]), item_group[i])
                 #print(sql)
-                self.db.execSql(sql)
+                self.updb.execSql(sql)
             
         #self.km = km
 
     def loadKmModel(self):
         # to load
-        sql = "select km_groupid from %s;" % (self.kmStatsTable)
-        for (groupid,) in self.db.execSql(sql):
-            a = groupid.split("-")
-            rootid = a[0]
+        sql = "SELECT distinct SUBSTRING_INDEX(km_groupid, '-', 1) as rootid from %s;" % (self.kmStatsTable)
+        for (rootid,) in self.redb.execSql(sql):
             kmf = self._getKmpklFilename(rootid)
             if os.path.exists(kmf):
                 with open(kmf, "rb") as f:
                     self.kms[rootid] = pickle.load(f)
-            
             
 
     def calcClusterStats(self):
@@ -518,7 +522,7 @@ on duplicate key update
         self.itemTable, 
         self.itemTable, 
         uxy)
-        self.db.execSql(sql)
+        self.updb.execSql(sql)
         
 
 
@@ -538,7 +542,7 @@ limit 12
         min_size)
 
         cls = {}
-        for (grpid2, cnt, m, s) in self.db.execSql(sql):
+        for (grpid2, cnt, m, s) in self.redb.execSql(sql):
             cls[grpid2] = {}
             cls[grpid2]["count"] = cnt
             cls[grpid2]["m"] = m
@@ -567,7 +571,7 @@ where km_groupid = '%s';""" % (",".join(xs),
 
             ax = fig.add_subplot(nrow, ncol, i+1)
 
-            for tp in self.db.execSql(sql):
+            for tp in self.redb.execSql(sql):
                 code = tp[0]
                 startep = tp[1]
                 endep = tp[2]
@@ -608,18 +612,19 @@ def run(jsonfile="anal_zz_conf.json", stage="all"):
     kmpkl_file = "%s/%s" % (work_dir, data["kmpkl_file"])
     a = ZzAnalyzer(granularity, n_points, kmpkl_file)
     
+    codenames = []
     year = datetime.now().year
     if "observe_year" in data.keys():
         year = data["observe_year"]
-    if stage == "all" or stage == "init":
-        a.initZzCodeTable(year)
-
-    codenames = []
     if "codenames" in data.keys():
         codenames = data["codenames"]
     else:
         codenames = a.getCodenamesFromDB(year)
 
+    if stage == "all" or stage == "init":
+        a.initZzCodeTable(year, codenames)
+
+    
     if stage == "all" or stage == "zigzag":
         a.registerData(startep, endep, codenames)
     
@@ -635,6 +640,6 @@ def run(jsonfile="anal_zz_conf.json", stage="all"):
 if __name__ == "__main__":
     #run()
     #run(stage="init")
-    run(stage="zigzag")
-    #run(stage="kmeans")
-    #run(stage="kmstats")
+    #run(stage="zigzag")
+    run(stage="kmeans")
+    run(stage="kmstats")

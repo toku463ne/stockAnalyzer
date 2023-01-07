@@ -30,8 +30,8 @@ pip3 install -r install/pip/requirements.txt
 echo pip3 install uwsgi
 pip3 install uwsgi
 
-echo install/uwsgi/create_uwsgi.ini.sh
-bash install/uwsgi/create_uwsgi.ini.sh
+#echo install/uwsgi/create_uwsgi.ini.sh
+#bash install/uwsgi/create_uwsgi.ini.sh
 
 echo install/systemd/create_stockanalapi.service.sh
 bash install/systemd/create_stockanalapi.service.sh

@@ -1,8 +1,9 @@
-CREATE TABLE IF NOT EXISTS anal_zzcodes (
+CREATE TABLE IF NOT EXISTS #TABLENAME# (
     `codename` VARCHAR(50),
+    `granularity` VARCHAR(10),
     `obsyear` INT,
     `market` VARCHAR(50),
     `nbars` INT,
-    `min_nth_volume` INT,
+    `min_nth_volume` BIGINT,
     PRIMARY KEY(codename, obsyear)
 );

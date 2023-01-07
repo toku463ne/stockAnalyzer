@@ -4,14 +4,17 @@ from env import *
 
 class MySqlDB(db.DB):
 	def __init__(self, is_master=False):
+		self.is_master = is_master
+
+	def connect(self):
 		inf = conf["mysql"]
 
 		condb = inf["db"]
-		if is_master == False:
+		if self.is_master == False:
 			if conf["is_test"]:
 				condb = inf["test_db"]
 
-		self.conn = pymysql.connect(
+		conn = pymysql.connect(
 				host = inf["host"],
 				db = condb,
 				user = inf["user"],
@@ -19,13 +22,13 @@ class MySqlDB(db.DB):
 				charset = "utf8",
 				local_infile = 1
 		)
-		self.dbName = condb
-		self.conn.autocommit(True)
+		conn.autocommit(True)
+		return conn
 
 	def execSql(self, sql):
 		cur = None
 		try:
-			cur = self.conn.cursor()
+			cur = self.connect().cursor()
 			cur.execute(sql)
 			return cur
 		except:
@@ -49,6 +52,7 @@ class MySqlDB(db.DB):
 		sql = "select count(*) as cnt from %s %s" % (tablename, strwhere)
 		cur = self.execSql(sql)
 		row = cur.fetchone()
+		cur.close()
 		return row[0]
 
 	def close(self):
@@ -64,7 +68,7 @@ class MySqlDB(db.DB):
 				sql = sql.replace(k, replaces[k])
 			f.close()
 			cur = self.execSql(sql)
-			return cur
+			cur.close()
 		except:
 			raise
 
@@ -98,6 +102,7 @@ WHERE (TABLE_SCHEMA = '%s') AND (TABLE_NAME = '%s');
 	def select1rec(self, sql):
 		cur = self.execSql(sql)
 		row = cur.fetchone()
+		cur.close()
 		if row:
 			return row
 

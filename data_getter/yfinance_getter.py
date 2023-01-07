@@ -1,9 +1,11 @@
 import time
 from data_getter import DataGetter
 import lib.tradelib as tradelib
-import yfinance as yf
+import lib
 import env
 
+
+import yfinance as yf
 from datetime import datetime
 
 class YFinanceGetter(DataGetter):
@@ -43,12 +45,19 @@ class YFinanceGetter(DataGetter):
 
 
     def getPrices(self, startep, endep, waitDownload=True):
+        start = datetime.utcfromtimestamp(startep)
+        end = datetime.utcfromtimestamp(endep)
         if waitDownload:
             time.sleep(self.data_get_interval)
-        start = datetime.fromtimestamp(startep)
-        end = datetime.fromtimestamp(endep)
+        
+        # timezone will be retrived from yfinance according to the ticker codename
+        # ex) timezone of Japanese stocks will be UTC+9:00
+        # start/end will be recognized as the retrived timezone
+        # If you give 2021-10-12 18:00 with period=D then it will return 2021-10-12 00:00+0900
         df = self.ticker.history(interval=self.interval, start=start, end=end)
-        df["EP"] =  [x.timestamp() for x in df.index] 
+
+        
+        df["EP"] =  [lib.dt2epoch(x) for x in df.index] 
         df["DT"] =  df.index
         df = df.rename(columns={"Open": "O", "High": "H", "Low": "L", 
                                 "Close": "C", 
