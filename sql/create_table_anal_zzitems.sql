@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS #TABLENAME# (
     startep INT,
     endep INT,
     km_groupid VARCHAR(50),
+    km_mode INT,
     #XYCOLUMS#,
     last_dir TINYINT,
     PRIMARY KEY(zzitemid),

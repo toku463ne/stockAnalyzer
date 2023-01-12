@@ -17,6 +17,8 @@ class Portoforio(object):
         self.loses = 0
         db = MySqlDB()
         db.createTable("trades")
+        db.createTable("trade_history")
+        self.db = db
 
     def getId(self, epoch, orderId):
         return "%d_%d" % (epoch, orderId)
@@ -40,6 +42,7 @@ class Portoforio(object):
             if len(history) > 0:
                 h = self.last_hist
             h["epoch"] = epoch
+            h["side"] = side
             h["orderId"] = orderId
             h["codename"] = event.codename
             h["granularity"] = event.granularity
@@ -101,10 +104,12 @@ class Portoforio(object):
                     self.trades[orderId]["result"] = "lose"
                     self.loses += 1
             t = self.trades[orderId]
-            print("[%s]%s: %s-%s code=%s open=%2f close=%2f side=%d expr=%s desc=%s" % (t["result"],
+            print("[%s]%s: %s-%s code=%s open=%2f close=%2f side=%d desc=%s" % (t["result"],
                 orderId, lib.epoch2str(t["open"]["epoch"], "%Y%m%d"),lib.epoch2str(epoch, "%Y%m%d"), 
                 t["codename"], t["open"]["price"], t["close"]["price"], 
-                t["side"], lib.epoch2str(t["expiration"]), t["open"]["desc"]))
+                t["side"], t["open"]["desc"]))
+            self.insertResult(orderId)
+        self.insertTradeHistory(h)
         self.last_hist = h
         if len(h.keys()) > 0:
             self.history[_id] = copy.deepcopy(h)
@@ -119,11 +124,22 @@ class Portoforio(object):
         return self.trades
 
     def clearDB(self):
-        db = MySqlDB()
-        db.execSql("delete from trades where trade_name = '%s'" % (self.trade_name))
+        self.db.execSql("delete from trades where trade_name = '%s'" % (self.trade_name))
+        self.db.execSql("delete from trade_history where trade_name = '%s'" % (self.trade_name))
 
-    def insertResult2DB(self):
-        db = MySqlDB()
+    def insertTradeHistory(self, h):
+        sql = """insert into trade_history(trade_name, epoch, reference_datetime, order_id,
+codename, side, price, units, 
+buy_offline, buy_online, sell_offline, sell_online) 
+values('%s', %d, '%s', '%s',
+'%s', %d, %f, %d,
+%f, %f, %f, %f)""" % (self.trade_name, h["epoch"], lib.epoch2str(h["epoch"]), h["orderId"],
+h["codename"], h["side"], h["price"], h["units"],
+h["buy_offline"], h["buy_online"], h["sell_offline"], h["sell_online"])
+
+        self.db.execSql(sql)
+
+    def insertResult(self, orderId):
         trade_name = self.trade_name
         sql = """insert into trades(trade_name,order_id,codename,result,profit,side,units,
 expiration_epoch,expiration_datetime,
@@ -132,24 +148,17 @@ takeprofit_price,stoploss_price,
 close_price,close_epoch,close_datetime,close_desc)
 values"""
 
-        trades = self.trades
-        is_first = True
-
-
-        for orderId in trades.keys():
-            t = trades[orderId]
-            if is_first == False:
-                sql += ","
-            side = t["side"]
-            units = t["units"]
-            profit = 0
-            open_price = t["open"]["price"]
-            close_price = t["close"]["price"]
-            if side == SIDE_BUY:
-                profit = (close_price - open_price)*units
-            if side == SIDE_SELL:
-                profit = (open_price - close_price)*units
-            sql += """('%s','%s','%s','%s',%f,%d,%d,
+        t = self.trades[orderId]
+        side = t["side"]
+        units = t["units"]
+        profit = 0
+        open_price = t["open"]["price"]
+        close_price = t["close"]["price"]
+        if side == SIDE_BUY:
+            profit = (close_price - open_price)*units
+        if side == SIDE_SELL:
+            profit = (open_price - close_price)*units
+        sql += """('%s','%s','%s','%s',%f,%d,%d,
 %d,'%s',
 %f,%d,'%s','%s',
 %f,%f,
@@ -160,9 +169,7 @@ open_price,t["open"]["epoch"],lib.epoch2str(t["open"]["epoch"]),t["open"]["desc"
 t["takeprofit_price"], t["stoploss_price"],
 close_price,t["close"]["epoch"],lib.epoch2str(t["close"]["epoch"]),t["close"]["desc"])
 
-            is_first = False
-        
-        db.execSql(sql)
+        self.db.execSql(sql)
 
 
 

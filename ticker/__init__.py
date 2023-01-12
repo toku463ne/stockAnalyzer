@@ -7,7 +7,7 @@ from consts import *
 
 class Ticker(object):
     def __init__(self, codename, granularity, 
-        startep, endep=0, buffNbars=100, **args):
+        startep, endep=0, buffNbars=100, load_db=False, use_master=True, **args):
         self.codename = codename
         self.granularity = granularity
         self.buffNbars = buffNbars
@@ -15,19 +15,25 @@ class Ticker(object):
         self.dg = dg
         self.unitsecs = dg.unitsecs
         self.args = args
-        self._resetData(startep, endep)
+        self._resetData(startep, endep, load_db=load_db, use_master=use_master)
 
-    def _resetData(self, startep, endep=0):
+    def _resetData(self, startep, endep=0, load_db=False, use_master=True):
         if endep == 0:
             endep = startep + self.unitsecs*self.buffNbars
         else:
             endep += self.unitsecs*self.buffNbars
         ohlcv = self.dg.getPrices(startep, endep)
-        self.initData(ohlcv, **self.args)
+        if load_db:
+            self.loadData(ohlcv, startep, endep, use_master=use_master, **self.args)
+        else:
+            self.initData(ohlcv, **self.args)
         self.index = -1
         self.err = TICKER_ERR_NONE
         self.data = None
 
+    # must inherit
+    def loadData(startep, endep, use_master=True, **args):
+        pass
 
     # must inherit
     def initData(self, ohlcv, **args):
@@ -115,7 +121,6 @@ class Ticker(object):
     def tick(self, ep=0):
         if self.err == TICKER_ERR_EOF:
             self._setCurrData(-1)
-            self.err = TICKER_ERR_EOF
             return False
         n = len(self.ep)
         if n == 0:
@@ -133,12 +138,16 @@ class Ticker(object):
                 if ep == self.ep[i]:
                     self.index = i
                     self._setCurrData(i)
+                    self.err = TICKER_ERR_NONE
                     return True
                 elif ep < self.ep[i]:
                     if i > 0:
                         j = i - 1
                         self.index = j
                         self._setCurrData(j)
+
+                        if ep - self.unitsecs > self.ep[j]:
+                            self.err = TICKER_NODATA
                     else:
                         self.err = TICKER_NODATA
                         self._setCurrData(-1)

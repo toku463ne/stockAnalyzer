@@ -1,7 +1,13 @@
 from event.order import OrderEvent
 from consts import *
+trade_mode = TRADE_MODE_ONLY_BUY
 
-class Strategy(object):
+class Strategy(object):    
+
+    def preProcess(self, timeTicker, portforio):
+        self.timeTicker = timeTicker
+        self.portforio = portforio
+
     def initAttrFromArgs(self, args, name, default=None):
         if name in args.keys():
             setattr(self, name, args[name])

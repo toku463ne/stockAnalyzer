@@ -7,6 +7,7 @@ from analyzer.zz_analyzer import ZzAnalyzer
 import data_getter
 
 import pandas as pd
+import math
 
 min_profit = 10000
 zz_size = 5
@@ -19,10 +20,12 @@ min_trade_len = 2
 max_fund = 100000
 min_unit = 100
 min_volume = 100000
+max_trades_a_day = 1
+trade_mode = TRADE_MODE_ONLY_BUY
 
 class ZzStatsStrategy(Strategy):
     
-    def __init__(self, args, use_master=False):
+    def __init__(self, args, use_master=False, load_zzdb=False):
         self.initAttrFromArgs(args, "codenames", [])
         self.initAttrFromArgs(args, "granularity")
         self.initAttrFromArgs(args, "kmpkl_file")
@@ -39,7 +42,10 @@ class ZzStatsStrategy(Strategy):
         self.initAttrFromArgs(args, "min_unit", min_unit)
         self.initAttrFromArgs(args, "min_volume", min_volume)
         self.initAttrFromArgs(args, "market", "")
+        self.initAttrFromArgs(args, "max_trades_a_day", max_trades_a_day)
+        self.initAttrFromArgs(args, "trade_mode", trade_mode)
         
+        self.load_zzdb = load_zzdb
 
         self.analyzer = ZzAnalyzer(self.granularity, 
             self.n_points, 
@@ -48,24 +54,25 @@ class ZzStatsStrategy(Strategy):
             use_master=use_master)
         self.analyzer.loadKmModel()
         self.tickers = {}
+
+
+    def preProcess(self, timeTicker, portforio):
+        super().preProcess(timeTicker, portforio)
+        granularity = self.granularity
+        startep = timeTicker.startep - self.n_points * self.zz_size * 3 * self.unitsecs
+        endep = timeTicker.endep
+        for codename in self.codenames:
+            self.tickers[codename] = Zigzag(codename, granularity, 
+                    startep, endep=endep, size=zz_size, load_db=self.load_zzdb)
+        if len(self.codenames) == 0:
+            self.codenames = self.analyzer.getCodenamesFromDB(lib.epoch2dt(startep).year, 
+                self.market, "<=")
+
         
-    """Todo: don't let last the trade too long    
-    """
     def onTick(self, epoch):
         granularity = self.granularity
         n_points = self.n_points
-        zz_size = self.zz_size
-        startep = epoch - n_points * zz_size * 3 * self.unitsecs
         
-        if len(self.tickers) == 0:
-            if len(self.codenames) == 0:
-                self.codenames = self.analyzer.getCodenamesFromDB(lib.epoch2dt(epoch).year, 
-                    self.market, "<=")
-        
-            for codename in self.codenames:
-                self.tickers[codename] = Zigzag(codename, granularity, 
-                        startep, endep=epoch, size=zz_size)
-
         index = []
         cnts = []
         lose_rates = []
@@ -81,6 +88,9 @@ class ZzStatsStrategy(Strategy):
         min_epoch = epoch + self.unitsecs * self.min_trade_len
         max_duration = self.zz_size*self.unitsecs*2
         min_cnt = self.min_km_count
+        max_fund = self.max_fund
+        min_unit = self.min_unit
+        trade_mode = self.trade_mode
 
 
         #if epoch == 1641513600:
@@ -90,23 +100,38 @@ class ZzStatsStrategy(Strategy):
             z = self.tickers[codename]
             z.tick(epoch)
             if z.updated:
-                (ep, dt , dirs, prices) = z.getData(n=n_points-1)
+                (ep, dt , dirs, prices) = z.getData(n=n_points-1, zz_mode=ZZ_MODE_RETURN_ONLY_LAST_MIDDLE)
                 if len(ep) < n_points-1:
                     continue
-                (cnt, lose_cnt, x, y, stdx, stdy, nstdx, nstdy, km_groupid) = self.analyzer.predictNext(ep, prices)
-                if cnt >= min_cnt:
-                    index.append(codename)
-                    cnts.append(cnt)
-                    lose_rates.append(lose_cnt*1.0/cnt)
-                    xs.append(x)
-                    ys.append(y)
-                    stdxs.append(stdx)
-                    stdys.append(stdy)
-                    nstdxs.append(nstdx)
-                    nstdys.append(nstdy)
-                    last_dirs.append(dirs[-1])
-                    last_prices.append(prices[-1])
-                    km_groupids.append(km_groupid)
+                vals = self.analyzer._normalizeItem(ep, prices)
+                if vals is None:
+                    continue
+                (cnt, lose_cnt, 
+                x, y, stdx, stdy, 
+                nstdx, nstdy, km_groupid) = self.analyzer.predictNext(vals, ep, prices)
+
+                lose_rate = lose_cnt/cnt
+                if lose_rate < 1-max_lose_rate and lose_rate > max_lose_rate:
+                    continue
+
+                if cnt < min_cnt:
+                    continue
+
+                if x < min_epoch:
+                    continue
+
+                index.append(codename)
+                cnts.append(cnt)
+                lose_rates.append(lose_cnt*1.0/cnt)
+                xs.append(x)
+                ys.append(y)
+                stdxs.append(stdx)
+                stdys.append(stdy)
+                nstdxs.append(nstdx)
+                nstdys.append(nstdy)
+                last_dirs.append(dirs[-1])
+                last_prices.append(prices[-1])
+                km_groupids.append(km_groupid)
 
         if len(index) == 0:
             return []
@@ -124,40 +149,31 @@ class ZzStatsStrategy(Strategy):
             }, 
         index=index)
 
-        #df = df[df["nstdx"] <= self.max_std]
-        #df = df[df["nstdy"] <= self.max_std]
-        df = df[(df["lose_rate"] <= self.max_lose_rate) | (df["lose_rate"] >= 1- self.max_lose_rate)]
-        df = df[df["x"] >= min_epoch]
-
         if len(df) == 0:
             return []
+
+        df = df.sort_values(by=["cnt", "lose_rate"], ascending=False)
 
         granularity = self.granularity
         min_profit = self.min_profit
         orders = []
+        n = 1
         for r in df.itertuples():
             dg = data_getter.getDataGetter(r.codename, granularity)
             (now, _, _, _, _, price, v) = dg.getPrice(epoch)
             if v < self.min_volume:
                 continue
             
-            unit = self.min_unit
-            fund = unit * price
-            max_fund = self.max_fund
-            while fund <= max_fund:
-                if fund*10 >= max_fund:
-                    break
-                unit *= 10
-                fund *= 10
-                
-            if fund > max_fund:
-                continue
-
-            #profit = r.y - r.stdy - price
             profit = r.y - price
-
-            if abs(profit)*unit < min_profit:
+            if profit == 0:
                 continue
+
+            ideal_unit = math.ceil(min_profit/abs(profit))
+            unit = min_unit * math.ceil(ideal_unit/min_unit)
+
+            if unit * price > max_fund:
+                continue
+
             side = SIDE_BUY
             if r.last_dir > 0:
                 side = SIDE_SELL
@@ -177,6 +193,12 @@ class ZzStatsStrategy(Strategy):
                 tp = sl
                 sl = tmp
                 side *= -1
+
+            if trade_mode == TRADE_MODE_ONLY_BUY and side != SIDE_BUY:
+                continue
+
+            if trade_mode == TRADE_MODE_ONLY_SELL and side != SIDE_SELL:
+                continue
             
             expiration = epoch + max_duration
 
@@ -190,6 +212,10 @@ class ZzStatsStrategy(Strategy):
                     desc="km_group=%s lose_rate=%2f" % (r.km_groupid, r.lose_rate)) 
 
             orders.append(order)
+
+            n += 1
+            if n > self.max_trades_a_day:
+                break
         return orders
         
         

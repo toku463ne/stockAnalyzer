@@ -16,6 +16,7 @@ class TradeManager(object):
     def run(self, endep=-1, orderstopep=-1):
         order_events = []
         strategy = self.strategy
+        strategy.preProcess(self.timeTicker)
         portforio = self.portforio
         
         portforio.clearDB()
@@ -45,7 +46,6 @@ class TradeManager(object):
                 strategy.onSignal(epoch, event)
                 portforio.onSignal(epoch, event)
 
-        portforio.insertResult2DB()
         return self.getReport()
 
 
