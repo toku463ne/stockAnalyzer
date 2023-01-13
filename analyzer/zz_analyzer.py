@@ -479,7 +479,7 @@ values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename,
         for (x, y) in self.stat_xy:
             if mxy != "":
                 mxy += ","
-            mxy += "avg(%s) %s, avg(%s) %s" % (x, x, y, y)
+            mxy += "trimmean(%s,.2) %s, trimmean(%s,.2) %s" % (x, x, y, y)
 
             if uxy != "":
                 uxy += ","
@@ -496,7 +496,7 @@ values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename,
     from
     (
         select km_groupid, count(zzitemid) cnt, 
-        avg(x%d) mx, avg(y%d) my, std(x%d) sx, std(y%d) sy,
+        trimmean(x%d,.2) mx, trimmean(y%d, .2) my, std(x%d) sx, std(y%d) sy,
         max(endep) last_epoch, %s  
         from %s
         where km_groupid is not null
@@ -732,7 +732,7 @@ if __name__ == "__main__":
     #feed(stage="init")
     #feed(stage="zigzag")
     #feed(stage="kmeans")
-    #feed(stage="kmstats")
+    feed(stage="kmstats")
     
     #predict()
-    corr()
+    #corr()

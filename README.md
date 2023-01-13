@@ -9,6 +9,8 @@ CREATE USER IF NOT EXISTS 'stockuser'@'localhost' IDENTIFIED BY 'stockpass';
 GRANT ALL PRIVILEGES ON stockanalyzer.* to 'stockuser'@'localhost';
 GRANT ALL PRIVILEGES ON stockanalyzer_test.* to 'stockuser'@'localhost';
 ```
+# Install MySQL tremmean
+https://github.com/StirlingMarketingGroup/mysql-trimmean  
 
 
 # install python libraries

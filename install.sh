@@ -11,9 +11,24 @@ mkdir -p $logdir
 
 echo apt update
 apt update
-echo apt -y install nodejs npm python3-pip python3-venv mariadb-server nginx build-essential libssl-dev libffi-dev python-dev libssl-dev
-apt -y install nodejs npm python3-pip python3-venv mariadb-server nginx build-essential libssl-dev libffi-dev python-dev libssl-dev
+echo apt -y install nodejs npm python3-pip python3-venv mariadb-server nginx build-essential libssl-dev libffi-dev python-dev libssl-dev libmysqlclient-dev
+apt -y install nodejs npm python3-pip python3-venv mariadb-server nginx build-essential libssl-dev libffi-dev python-dev libssl-dev libmysqlclient-dev
 
+plugindir=`mysql -sN -e "select @@plugin_dir;"`
+
+echo mkdir -p /usr/local/src/git
+mkdir -p /usr/local/src/git
+cd /usr/local/src/git
+echo git clone https://github.com/StirlingMarketingGroup/mysql-trimmean.git
+git clone https://github.com/StirlingMarketingGroup/mysql-trimmean.git
+cd mysql-trimmean
+echo gcc -O3 -I/usr/include/mysql -o trimmean.so -shared trimmean.c -fPIC
+gcc -O3 -I/usr/include/mysql -o trimmean.so -shared trimmean.c -fPIC
+echo cp trimmean.so $plugindir
+cp trimmean.so $plugindir
+
+echo mysql -e "create aggregate function trimmean returns real soname'trimmean.so';"
+mysql -e "create aggregate function`trimmean`returns real soname'trimmean.so';"
 
 echo 'mysql -uroot < sql/init_database.sql'
 mysql -uroot < sql/init_database.sql
