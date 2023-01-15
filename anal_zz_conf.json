@@ -5,7 +5,7 @@
     "work_dir": "stockanaldata/zz",
     "kmpkl_file": "km_2010-2020.pkl",
     "start_date": "2010-01-01",
-    "end_date": "2020-12-31",
+    "end_date": "2022-12-31",
     "observe_year": 2020,
     "reliable_cluster_size": 10
 }

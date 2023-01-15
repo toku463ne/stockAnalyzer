@@ -5,9 +5,8 @@ from db.mysql import MySqlDB
         
 
 class Portoforio(object):
-    def __init__(self, trade_name, unitSize=1000):
+    def __init__(self, trade_name):
         self.trade_name = trade_name
-        self.unitSize = unitSize
         self.history = {}
         self.last_hist = {}
         self.order_hist = {}
@@ -120,6 +119,19 @@ class Portoforio(object):
     def getHistory(self):
         return self.history
 
+    def getBuyOffLine(self):
+        h = self.last_hist
+        if len(h) == 0:
+            return 0
+        return abs(h["buy_offline"])
+
+    def getSellOffLine(self):
+        h = self.last_hist
+        if len(h) == 0:
+            return 0
+        return abs(h["sell_offline"])
+    
+
     def getTrades(self):
         return self.trades
 
@@ -138,6 +150,7 @@ h["codename"], h["side"], h["price"], h["units"],
 h["buy_offline"], h["buy_online"], h["sell_offline"], h["sell_online"])
 
         self.db.execSql(sql)
+        
 
     def insertResult(self, orderId):
         trade_name = self.trade_name

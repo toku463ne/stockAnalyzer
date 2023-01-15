@@ -2,8 +2,11 @@ from env import *
 from consts import *
 
 class TradeManager(object):
-    def __init__(self, name, timeTicker, strategy, executor, portforio):
+    def __init__(self, name, buy_budget, sell_budget,
+        timeTicker, strategy, executor, portforio):
         self.name = name
+        self.buy_budget = buy_budget
+        self.sell_budget = sell_budget
         self.maxId = 0
         self.orders = {}
         self.trans = []
@@ -16,7 +19,7 @@ class TradeManager(object):
     def run(self, endep=-1, orderstopep=-1):
         order_events = []
         strategy = self.strategy
-        strategy.preProcess(self.timeTicker)
+        strategy.preProcess(self.timeTicker, self.portforio)
         portforio = self.portforio
         
         portforio.clearDB()
@@ -26,7 +29,7 @@ class TradeManager(object):
             epoch = t.epoch
             if endep > 0 and epoch > endep:
                 break
-        
+
             #portforio.onTick(self.orders)
             if epoch <= orderstopep:
                 order_events = strategy.onTick(epoch)
@@ -55,6 +58,22 @@ class TradeManager(object):
 
     
     def receiveOrder(self, epoch, orderEvent):
+        if orderEvent.cmd in [CMD_CREATE_STOP_ORDER,
+                            CMD_CREATE_LIMIT_ORDER,
+                            CMD_CREATE_MARKET_ORDER]:
+            purch_price = orderEvent.price * orderEvent.units
+            portforio = self.portforio
+            buy_offline = portforio.getBuyOffLine()
+            if orderEvent.side == SIDE_BUY and buy_offline + purch_price > self.buy_budget:
+                orderEvent.error_msg = "Over Buy budget"
+                orderEvent.cmd = CMD_ORDER_ERROR
+                return False
+            sell_offline = portforio.getSellOffLine()
+            if orderEvent.side == SIDE_SELL and sell_offline + purch_price > self.sell_budget:
+                orderEvent.error_msg = "Over Sell budget"
+                orderEvent.cmd = CMD_ORDER_ERROR
+                return False
+
         if self.executor.checkOrder(epoch, orderEvent) == False:
             return False
         orderEvent.setId(self.genId())

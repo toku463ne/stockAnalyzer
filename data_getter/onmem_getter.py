@@ -69,6 +69,9 @@ class OnMemGetter(DataGetter):
 
             starti = self.getIndex(startep)
             endi = self.getIndex(endep)
+            if starti == -1 and endi > 0:
+                starti = 0
+
             if starti <= 0 and endi == -1:
                 return (ep, dt, o, h, l, c, v)
             else:

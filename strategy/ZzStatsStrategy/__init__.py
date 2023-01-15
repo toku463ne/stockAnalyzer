@@ -13,6 +13,8 @@ min_profit = 10000
 zz_size = 5
 n_points = 5
 min_km_count = 20
+min_feed_year_rate = 0.5
+min_feed_score = 0.6
 max_orders = 3
 max_std = 0.3
 max_lose_rate = 0.3
@@ -44,6 +46,8 @@ class ZzStatsStrategy(Strategy):
         self.initAttrFromArgs(args, "market", "")
         self.initAttrFromArgs(args, "max_trades_a_day", max_trades_a_day)
         self.initAttrFromArgs(args, "trade_mode", trade_mode)
+        self.initAttrFromArgs(args, "min_feed_year_rate", min_feed_year_rate)
+        self.initAttrFromArgs(args, "min_feed_score", min_feed_score)
         
         self.load_zzdb = load_zzdb
 
@@ -53,6 +57,13 @@ class ZzStatsStrategy(Strategy):
             zz_size=self.zz_size,
             use_master=use_master)
         self.analyzer.loadKmModel()
+        self.n_feed_years = self.analyzer.getNFeededYears()
+        
+        kms = self.analyzer.getDeflectedKmGroups()
+        kms = kms[kms["total"] >= self.n_feed_years*self.min_feed_year_rate]
+        kms = kms[(kms["score1"] > min_feed_score) | (kms["score2"] > min_feed_score)]
+        self.deflectedKms = kms
+
         self.tickers = {}
 
 
@@ -61,17 +72,19 @@ class ZzStatsStrategy(Strategy):
         granularity = self.granularity
         startep = timeTicker.startep - self.n_points * self.zz_size * 3 * self.unitsecs
         endep = timeTicker.endep
-        for codename in self.codenames:
-            self.tickers[codename] = Zigzag(codename, granularity, 
-                    startep, endep=endep, size=zz_size, load_db=self.load_zzdb)
         if len(self.codenames) == 0:
             self.codenames = self.analyzer.getCodenamesFromDB(lib.epoch2dt(startep).year, 
                 self.market, "<=")
+        for codename in self.codenames:
+            self.tickers[codename] = Zigzag(codename, granularity, 
+                    startep, endep=endep, size=zz_size, load_db=self.load_zzdb)
+        
 
         
     def onTick(self, epoch):
         granularity = self.granularity
         n_points = self.n_points
+        n_feed_years = self.n_feed_years
         
         index = []
         cnts = []
@@ -91,6 +104,7 @@ class ZzStatsStrategy(Strategy):
         max_fund = self.max_fund
         min_unit = self.min_unit
         trade_mode = self.trade_mode
+        deflectedKms = self.deflectedKms
 
 
         #if epoch == 1641513600:
@@ -110,12 +124,15 @@ class ZzStatsStrategy(Strategy):
                 x, y, stdx, stdy, 
                 nstdx, nstdy, km_groupid) = self.analyzer.predictNext(vals, ep, prices)
 
+                if km_groupid not in deflectedKms.index:
+                    continue
+                
                 lose_rate = lose_cnt/cnt
-                if lose_rate < 1-max_lose_rate and lose_rate > max_lose_rate:
-                    continue
+                #if lose_rate < 1-max_lose_rate and lose_rate > max_lose_rate:
+                #    continue
 
-                if cnt < min_cnt:
-                    continue
+                #if cnt < min_cnt:
+                #    continue
 
                 if x < min_epoch:
                     continue

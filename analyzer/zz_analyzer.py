@@ -1,6 +1,7 @@
 
 import sys
 import os
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from env import *
 from consts import *
@@ -529,6 +530,101 @@ on duplicate key update
         self.updb.execSql(sql)
         
 
+    def getNFeededYears(self):
+        sql = """select count(*) from (
+select distinct year(FROM_UNIXTIME(startep)) year 
+from %s 
+where km_mode <= %d) a""" % (self.itemTable, ZZ_KMMODE_FEEDED)
+        (ycnt,) = self.redb.select1rec(sql)
+        return ycnt
+
+    """
+    Deflection score is 
+    """
+    def getDeflectedKmGroups(self, deflect_rate=0.65, 
+        min_cnt_a_year=10, km_mode=ZZ_KMMODE_FEEDED):
+        sql = """SELECT km_groupid, year(FROM_UNIXTIME(startep)) year,
+abs(last_dir) dir, 
+count(abs(last_dir)) cnt
+FROM %s
+where km_mode = %d
+group by km_groupid, year, dir
+having cnt >= %d
+""" % (self.itemTable, km_mode, min_cnt_a_year)
+
+        df = self.df.read_sql(sql)
+        df1 = df[df["dir"] == 1]
+        df2 = df[df["dir"] == 2]
+        dfm = pd.merge(df1[["km_groupid","year", "cnt"]], 
+                df2[["km_groupid","year", "cnt"]], 
+                on=["km_groupid", "year"], how="outer").replace(np.nan, 0)
+        dfm["total"] = dfm["cnt_x"]+dfm["cnt_y"]
+        dfm["r1"]  = dfm["cnt_x"]/dfm["total"]
+
+        dftotal = dfm.groupby(["km_groupid"]).count()[["total"]]
+        df1 = dfm[dfm["r1"] >= deflect_rate].groupby(["km_groupid"]).count()[["total"]]
+        df2 = dfm[dfm["r1"] <= 1-deflect_rate].groupby(["km_groupid"]).count()[["total"]]
+        df1 = df1.rename(columns={"total": "total1"})
+        df2 = df2.rename(columns={"total": "total2"})
+
+        df = pd.merge(dftotal, df1, on=["km_groupid"], how="outer").replace(np.nan, 0)
+        df = pd.merge(df, df2, on=["km_groupid"], how="outer").replace(np.nan, 0)
+        df["score1"] = df["total1"]/df["total"]
+        df["score2"] = df["total2"]/df["total"]
+
+        return df
+
+    def plotKmGroups(self, km_groupids, vsize=5, hsize=15):
+        ncol = 1
+        nrow = math.ceil(len(km_groupids)/ncol)
+        fig = plt.figure(figsize=[hsize,vsize*nrow])
+        xs = []
+        ys = []
+        for i in range(self.n_points):
+            xs.append("x%d" % i)
+            ys.append("y%d" % i)
+
+        i = 0
+        for km_groupid in km_groupids:
+            sql = """select item.codename, item.startep, item.endep, 
+meanx, meany, stdx, stdy,
+%s, %s from 
+%s as item 
+left join 
+(select km_groupid, meanx, meany, stdx, stdy from %s) ks 
+on item.km_groupid = ks.km_groupid
+where item.km_groupid = '%s';""" % (",".join(xs), 
+            ",".join(ys), 
+            self.itemTable, self.kmStatsTable, km_groupid)
+            #print(sql)
+
+            ax = fig.add_subplot(nrow, ncol, i+1)
+
+            for tp in self.redb.execSql(sql):
+                code = tp[0]
+                startep = tp[1]
+                endep = tp[2]
+                meanx = tp[3]
+                meany = tp[4]
+                stdx = tp[5]
+                stdy = tp[6]
+                x = np.asarray(tp[7:7+self.n_points])
+                y = np.asarray(tp[7+self.n_points:7+2*self.n_points])
+
+                if x[-1] > meanx+3*stdx or x[-1] < meanx-3*stdx:
+                    continue
+                if y[-1] > meany+3*stdy or y[-1] < meany-3*stdy:
+                    continue
+
+                legend = "%s %s-%s" % (code, 
+                    lib.epoch2str(startep, "%Y-%m-%d"), 
+                    lib.epoch2str(endep, "%Y-%m-%d"))
+
+                ax.plot(x, y, label=legend)
+                #ax.legend()
+                ax.set_title("groupid=%s" % (km_groupid))
+            i += 1
+
 
 
     def plotTopClusters(self, min_size=10):
@@ -665,10 +761,9 @@ corr of count and d-lo corr
         """
 
     
-def _getAnalizer(jsonfile):
-    import env
+def getAnalizer(jsonfile):
     data = ""
-    with open("%s/%s" % (env.BASE_DIR, jsonfile), "r") as f:
+    with open("%s/%s" % (BASE_DIR, jsonfile), "r") as f:
         data = json.load(f)
 
     n_points = data["n_points"]
@@ -700,17 +795,27 @@ def _getAnalizer(jsonfile):
     return (a, startep, endep, codenames, year)
     
 
+def plotKms(km_groupids, jsonfile="anal_zz_conf.json", vsize=5, hsize=15):
+    data = ""
+    with open("%s/%s" % (BASE_DIR, jsonfile), "r") as f:
+        data = json.load(f)
+    n_points = data["n_points"]
+    granularity = data["granularity"]
+    kmpkl_file = ""
+    a = ZzAnalyzer(granularity, n_points, kmpkl_file)
+    a.plotKmGroups(km_groupids, vsize, hsize)
+
 def predict(jsonfile="anal_zz_predicts.json"):
-    (a, startep, endep, codenames, _) = _getAnalizer(jsonfile)
+    (a, startep, endep, codenames, _) = getAnalizer(jsonfile)
     a.registerData(startep, endep, codenames, with_prediction=True)
 
 def corr(jsonfile="anal_zz_predicts.json"):
-    (a, _, _, _, _) = _getAnalizer(jsonfile)
+    (a, _, _, _, _) = getAnalizer(jsonfile)
     a.getCorrOfPredicted()
     
 
 def feed(jsonfile="anal_zz_conf.json", stage="all"):
-    (a, startep, endep, codenames, year) = _getAnalizer(jsonfile)
+    (a, startep, endep, codenames, year) = getAnalizer(jsonfile)
 
     if stage == "all" or stage == "init":
         a.initZzCodeTable(year, codenames)
@@ -724,15 +829,15 @@ def feed(jsonfile="anal_zz_conf.json", stage="all"):
     if stage == "all" or stage == "kmstats":
         a.calcClusterStats()
 
-    if stage == "plot":
-        a.plotTopClusters()
+    #if stage == "plot":
+    #    a.plotTopClusters()
 
 if __name__ == "__main__":
     #feed()
     #feed(stage="init")
     #feed(stage="zigzag")
     #feed(stage="kmeans")
-    feed(stage="kmstats")
+    #feed(stage="kmstats")
     
-    #predict()
+    predict()
     #corr()

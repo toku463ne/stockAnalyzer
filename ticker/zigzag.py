@@ -35,7 +35,7 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
         self.middle_size = middle_size
         self.curr_zi = -1
         self.pos = 0
-        self.tick_indexes = {}
+        self.tick_indexes = []
 
 
     def _postinit(self, ep):
@@ -45,6 +45,8 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
         for zi in range(len(zz_ep)):
             ze = zz_ep[zi]
             while True:
+                #if ti >= len(ep):
+                #    break
                 if ze == ep[ti]:
                     tick_indexes.append(ti)
                     break
