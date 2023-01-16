@@ -72,3 +72,12 @@ def mergeJson(j1, j2):
 def ensureDir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+def initAttrFromArgs(self, args, name, default=None):
+    if name in args.keys():
+        setattr(self, name, args[name])
+    elif default is None:
+        raise Exception("%s is necessary!" % name)
+    else:
+        setattr(self, name, default)
+    

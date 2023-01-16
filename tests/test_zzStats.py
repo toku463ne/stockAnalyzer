@@ -315,16 +315,15 @@ class TestZzStatsStrategy(unittest.TestCase):
         '9003.T','9005.T','9006.T','9007.T','9008.T','9009.T','9010.T','9020.T','9021.T','9022.T',
         '9990.T','9991.T','9997.T','^DJI','^GSPC','^N225']
 
-        #args["codenames"] = ['9997.T']
+        args["codenames"] = ['9997.T']
         #args["codenames"] = []
         
         args["market"] = "prime"
         strategy = ZzStatsStrategy(args, use_master=True, load_zzdb=True)
         ticker = TimeTicker(tradelib.getUnitSecs(granularity), st, ed)
         executor = Executor()
-        portforio = Portoforio("zzstats_test5")
+        portforio = Portoforio("zzstats_test6",buy_budget, sell_budget)
         tm = TradeManager("zigzag stats strategy", 
-            buy_budget, sell_budget,
             ticker, strategy, executor, portforio)
         report = tm.run(orderstopep=os)
 

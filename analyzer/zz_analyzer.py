@@ -174,18 +174,32 @@ and startep = %d
 
         return vals
 
-    """
-    # prices must be normalized by self._normalizeItem
-    def predictNext(self, ep, prices):
-        if len(ep) != self.n_points-1 or len(prices) != self.n_points-1:
-            return (-1,)*9
-
-        vals = self._normalizeItem(ep, prices)
-        if vals is None:
-            return (-1,)*9
-    """
-
     def predictNext(self, norm_vals, ep, prices):
+        rootid = self._calcKmRootGroupId(norm_vals)
+        kmid = 0
+        if rootid in self.kms.keys():
+            kmid = self.kms[rootid].predict([norm_vals])[0]
+        groupid = self._getKmGroupId(rootid, kmid)
+        
+        sql = """select meanx, meany from %s
+where km_groupid = '%s';""" % (self.kmStatsTable, groupid)
+
+        res = self.redb.select1rec(sql)
+        if res == None:
+            return (-1,)*3
+        (meanx, meany) = res
+
+        gapx = ep[-1] - ep[0]
+        gapy = max(prices) - min(prices)
+
+        x = gapx*meanx
+        y = gapy*meany
+
+        return (x, y, groupid)
+
+    
+
+    def oldpredictNext(self, norm_vals, ep, prices):
         rootid = self._calcKmRootGroupId(norm_vals)
         kmid = 0
         if rootid in self.kms.keys():
@@ -472,8 +486,60 @@ values('%s', %d, '%s', %f, %d, %d);""" % (self.dataTableName, codename,
                 with open(kmf, "rb") as f:
                     self.kms[rootid] = pickle.load(f)
             
-
     def calcClusterStats(self):
+        mxy = ""
+        uxy = ""
+        cxy = ""
+        for (x, y) in self.stat_xy:
+            if mxy != "":
+                mxy += ","
+            mxy += "trimmean(%s,.2) %s, trimmean(%s,.2) %s" % (x, x, y, y)
+
+            if uxy != "":
+                uxy += ","
+            uxy += "%s = values(%s), %s = values(%s)"  % (x, x, y, y)
+
+            if cxy != "":
+                cxy += ","
+            cxy += "%s, %s" % (x, y)
+
+        sql = """insert into 
+%s(`km_groupid`, `count`, `peak_count`, `meanx`, `meany`, `stdx`, `stdy`, `last_epoch`, %s)         
+(
+    select km_groupid, cnt, dir_sum - cnt as peak_count, mx, my, sx, sy, last_epoch, %s
+    from
+    (
+        select km_groupid, count(zzitemid) cnt, sum(abs(last_dir)) dir_sum,
+        trimmean(x%d-x%d,.2) mx, trimmean(y%d-y%d, .2) my, 
+        std(x%d-x%d) sx, std(y%d-y%d) sy,
+        max(endep) last_epoch, %s
+        from %s
+        where km_groupid is not null
+        and km_mode = %d
+        group by km_groupid
+    ) a
+)
+on duplicate key update 
+`count` = values(`count`),
+`peak_count` = values(`peak_count`),
+`meanx` = values(`meanx`),
+`meany` = values(`meany`),
+`stdx` = values(`stdx`),
+`stdy` = values(`stdy`),
+`last_epoch` = values(`last_epoch`),
+%s
+;""" % (self.kmStatsTable, cxy,
+        cxy, 
+        self.n_points-1, self.n_points-2, self.n_points-1, self.n_points-2, 
+        self.n_points-1, self.n_points-2, self.n_points-1, self.n_points-2,
+        mxy, 
+        self.itemTable, 
+        ZZ_KMMODE_FEEDED,
+        uxy
+        )
+        self.updb.execSql(sql)
+        
+    def oldcalcClusterStats(self):
         mxy = ""
         uxy = ""
         cxy = ""
@@ -837,7 +903,7 @@ if __name__ == "__main__":
     #feed(stage="init")
     #feed(stage="zigzag")
     #feed(stage="kmeans")
-    #feed(stage="kmstats")
+    feed(stage="kmstats")
     
-    predict()
+    #predict()
     #corr()

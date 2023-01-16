@@ -2,11 +2,9 @@ from env import *
 from consts import *
 
 class TradeManager(object):
-    def __init__(self, name, buy_budget, sell_budget,
+    def __init__(self, name,
         timeTicker, strategy, executor, portforio):
         self.name = name
-        self.buy_budget = buy_budget
-        self.sell_budget = sell_budget
         self.maxId = 0
         self.orders = {}
         self.trans = []
@@ -63,13 +61,13 @@ class TradeManager(object):
                             CMD_CREATE_MARKET_ORDER]:
             purch_price = orderEvent.price * orderEvent.units
             portforio = self.portforio
-            buy_offline = portforio.getBuyOffLine()
-            if orderEvent.side == SIDE_BUY and buy_offline + purch_price > self.buy_budget:
+            buy_fund = portforio.getBuyFund()
+            if orderEvent.side == SIDE_BUY and buy_fund - purch_price < 0:
                 orderEvent.error_msg = "Over Buy budget"
                 orderEvent.cmd = CMD_ORDER_ERROR
                 return False
-            sell_offline = portforio.getSellOffLine()
-            if orderEvent.side == SIDE_SELL and sell_offline + purch_price > self.sell_budget:
+            sell_fund = portforio.getSellFund()
+            if orderEvent.side == SIDE_SELL and sell_fund - purch_price < 0:
                 orderEvent.error_msg = "Over Sell budget"
                 orderEvent.cmd = CMD_ORDER_ERROR
                 return False

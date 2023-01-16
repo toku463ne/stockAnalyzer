@@ -54,5 +54,5 @@ class MyDf(db.DB):
                 time_to_sleep += 1
             cnt += 1
         if df is None:
-            print("here")
+            raise Exception("couldn't get dataframe")
         return df

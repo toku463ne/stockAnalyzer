@@ -62,6 +62,7 @@ class ZzStatsStrategy(Strategy):
         kms = self.analyzer.getDeflectedKmGroups()
         kms = kms[kms["total"] >= self.n_feed_years*self.min_feed_year_rate]
         kms = kms[(kms["score1"] > min_feed_score) | (kms["score2"] > min_feed_score)]
+        kms["score"] = kms[["score1", "score2"]].max(axis=1)
         self.deflectedKms = kms
 
         self.tickers = {}
@@ -87,14 +88,11 @@ class ZzStatsStrategy(Strategy):
         n_feed_years = self.n_feed_years
         
         index = []
-        cnts = []
-        lose_rates = []
+        scores = []
+        scores1 = []
+        scores2 = []
         xs = []
         ys = []
-        stdxs = []
-        stdys = []
-        nstdxs = []
-        nstdys = []
         last_dirs = []
         last_prices = []
         km_groupids = []
@@ -120,32 +118,25 @@ class ZzStatsStrategy(Strategy):
                 vals = self.analyzer._normalizeItem(ep, prices)
                 if vals is None:
                     continue
-                (cnt, lose_cnt, 
-                x, y, stdx, stdy, 
-                nstdx, nstdy, km_groupid) = self.analyzer.predictNext(vals, ep, prices)
+                (x, y, km_groupid) = self.analyzer.predictNext(vals, ep, prices)
 
                 if km_groupid not in deflectedKms.index:
                     continue
-                
-                lose_rate = lose_cnt/cnt
-                #if lose_rate < 1-max_lose_rate and lose_rate > max_lose_rate:
-                #    continue
 
-                #if cnt < min_cnt:
-                #    continue
+                row = deflectedKms[deflectedKms.index==km_groupid]
+                score = row["score"].values[0]
+                score1 = row["score1"].values[0]
+                score2 = row["score2"].values[0]
 
-                if x < min_epoch:
+                if x+epoch < min_epoch:
                     continue
 
                 index.append(codename)
-                cnts.append(cnt)
-                lose_rates.append(lose_cnt*1.0/cnt)
                 xs.append(x)
                 ys.append(y)
-                stdxs.append(stdx)
-                stdys.append(stdy)
-                nstdxs.append(nstdx)
-                nstdys.append(nstdy)
+                scores.append(score)
+                scores1.append(score1)
+                scores2.append(score2)
                 last_dirs.append(dirs[-1])
                 last_prices.append(prices[-1])
                 km_groupids.append(km_groupid)
@@ -155,11 +146,10 @@ class ZzStatsStrategy(Strategy):
 
         df = pd.DataFrame({
                 "codename": index,
-                "cnt": cnts, 
-                "lose_rate": lose_rates, 
                 "x": xs, "y": ys, 
-                "stdx": stdxs, "stdy": stdys,
-                "nstdx": nstdxs, "nstdy": nstdys,
+                "score": scores,
+                "score1": scores1,
+                "score2": scores2,
                 "last_dir": last_dirs,
                 "last_price": last_prices,
                 "km_groupid": km_groupids
@@ -169,7 +159,7 @@ class ZzStatsStrategy(Strategy):
         if len(df) == 0:
             return []
 
-        df = df.sort_values(by=["cnt", "lose_rate"], ascending=False)
+        df = df.sort_values(by=["score"], ascending=False)
 
         granularity = self.granularity
         min_profit = self.min_profit
@@ -181,7 +171,7 @@ class ZzStatsStrategy(Strategy):
             if v < self.min_volume:
                 continue
             
-            profit = r.y - price
+            profit = r.y
             if profit == 0:
                 continue
 
@@ -198,14 +188,10 @@ class ZzStatsStrategy(Strategy):
             if side * profit <= 0:
                 continue 
 
-            tp = 0
-            if side == SIDE_BUY:
-                tp = max(r.y, (price-r.last_price)+price)
-            if side == SIDE_SELL:
-                tp = min(r.y, price-(r.last_price-price))
-            sl = price - (tp-price)
+            tp = price + profit
+            sl = price - profit
 
-            if r.lose_rate >= 1- self.max_lose_rate:
+            if r.score1 > r.score2:
                 tmp = tp
                 tp = sl
                 sl = tmp
@@ -226,7 +212,7 @@ class ZzStatsStrategy(Strategy):
                     takeprofit=tp, 
                     stoploss=sl,
                     expiration=expiration,
-                    desc="km_group=%s lose_rate=%2f" % (r.km_groupid, r.lose_rate)) 
+                    desc="%s" % (r.km_groupid)) 
 
             orders.append(order)
 

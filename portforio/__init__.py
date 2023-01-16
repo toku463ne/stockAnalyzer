@@ -5,7 +5,7 @@ from db.mysql import MySqlDB
         
 
 class Portoforio(object):
-    def __init__(self, trade_name):
+    def __init__(self, trade_name, buy_budget, sell_budget):
         self.trade_name = trade_name
         self.history = {}
         self.last_hist = {}
@@ -14,6 +14,11 @@ class Portoforio(object):
         self.trades = {}
         self.wins = 0
         self.loses = 0
+        self.buy_budget = buy_budget
+        self.sell_budget = sell_budget
+        self.buy_fund = buy_budget
+        self.sell_fund = sell_budget
+        
         db = MySqlDB()
         db.createTable("trades")
         db.createTable("trade_history")
@@ -66,9 +71,11 @@ class Portoforio(object):
             self.order_hist[orderId] = [_id]
             if side == SIDE_BUY:
                 h["buy_offline"] -= total
+                self.buy_fund -= total
                 h["buy_online"] += total
             if side == SIDE_SELL:
                 h["sell_offline"] += total
+                self.sell_fund -= total
                 h["sell_online"] -= total
             self.trade_count += 1
             h["trade_count"] = self.trade_count
@@ -86,6 +93,7 @@ class Portoforio(object):
             last_total = h1["price"] * h1["units"]
             if side == SIDE_BUY:
                 h["buy_offline"] += total
+                self.buy_fund += total
                 h["buy_online"] -= last_total
                 if diff > 0:
                     self.trades[orderId]["result"] = "win"
@@ -95,6 +103,7 @@ class Portoforio(object):
                     self.loses += 1
             if side == SIDE_SELL:
                 h["sell_offline"] -= total
+                self.sell_fund += total
                 h["sell_online"] += last_total
                 if diff < 0:
                     self.trades[orderId]["result"] = "win"
@@ -119,17 +128,11 @@ class Portoforio(object):
     def getHistory(self):
         return self.history
 
-    def getBuyOffLine(self):
-        h = self.last_hist
-        if len(h) == 0:
-            return 0
-        return abs(h["buy_offline"])
+    def getBuyFund(self):
+        return self.buy_fund
 
-    def getSellOffLine(self):
-        h = self.last_hist
-        if len(h) == 0:
-            return 0
-        return abs(h["sell_offline"])
+    def getSellFund(self):
+        return self.sell_fund
     
 
     def getTrades(self):
