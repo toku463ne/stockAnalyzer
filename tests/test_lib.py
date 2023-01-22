@@ -1,6 +1,8 @@
 import __init__
 import unittest
 import lib
+from consts import *
+        
 
 class TestLib(unittest.TestCase):
     def test_mergeJson(self):
@@ -28,7 +30,18 @@ class TestLib(unittest.TestCase):
         self.assertEqual(j1["a"], 1)
         self.assertEqual(j1["b"], 2)
 
-
+    def test_ensureDataDir(self):
+        import os
+        home = os.environ["HOME"]
+        self.assertEqual(lib.ensureDataDir(), home + "/" + DEFAULT_DATA_DIR)
+        self.assertTrue(os.path.exists(home + "/" + DEFAULT_DATA_DIR))
+        
+        self.assertEqual(lib.ensureDataDir("/tmp/stockanaltest"), "/tmp/stockanaltest")
+        self.assertTrue(os.path.exists("/tmp/stockanaltest"))
+        
+        self.assertEqual(lib.ensureDataDir("/tmp/stockanaltest", subdir="zz"), "/tmp/stockanaltest/zz")
+        self.assertTrue(os.path.exists("/tmp/stockanaltest/zz"))
+        
 
 if __name__ == "__main__":
     unittest.main()

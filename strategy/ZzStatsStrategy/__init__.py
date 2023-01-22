@@ -5,6 +5,7 @@ from consts import *
 from ticker.zigzag import Zigzag
 from analyzer.zz_analyzer import ZzAnalyzer
 import data_getter
+from predictor.zz import ZzPredictor
 
 import pandas as pd
 import math
@@ -23,7 +24,7 @@ max_fund = 100000
 min_unit = 100
 min_volume = 100000
 max_trades_a_day = 1
-trade_mode = TRADE_MODE_ONLY_BUY
+trade_mode = TRADE_MODE_BOTH
 
 class ZzStatsStrategy(Strategy):
     
@@ -64,6 +65,8 @@ class ZzStatsStrategy(Strategy):
         kms = kms[(kms["score1"] > min_feed_score) | (kms["score2"] > min_feed_score)]
         kms["score"] = kms[["score1", "score2"]].max(axis=1)
         self.deflectedKms = kms
+
+        self.predictor = ZzPredictor()
 
         self.tickers = {}
 
@@ -159,7 +162,7 @@ class ZzStatsStrategy(Strategy):
         if len(df) == 0:
             return []
 
-        df = df.sort_values(by=["score"], ascending=False)
+        df = df.sort_values(by=["last_price"], ascending=False)
 
         granularity = self.granularity
         min_profit = self.min_profit

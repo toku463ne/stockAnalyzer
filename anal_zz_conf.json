@@ -2,10 +2,9 @@
     "granularity": "D",
     "n_points": 5,
     "zz_size": 5,
-    "work_dir": "stockanaldata/zz",
-    "kmpkl_file": "km_2010-2020.pkl",
+    "data_dir": "app/stockAnalyzer/zz",
     "start_date": "2010-01-01",
     "end_date": "2022-12-31",
-    "observe_year": 2020,
-    "reliable_cluster_size": 10
+    "km_granularity": "Y",
+    "km_period": 5
 }

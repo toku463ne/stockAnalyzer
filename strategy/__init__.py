@@ -10,9 +10,13 @@ class Strategy(object):
         self.portforio = portforio
 
     def initAttrFromArgs(self, args, name, default=None):
-        lib.initAttrFromArgs(self, args, name, default=default)
-        
-
+        if name in args.keys():
+            setattr(self, name, args[name])
+        elif default is None:
+            raise Exception("%s is necessary!" % name)
+        else:
+            setattr(self, name, default)
+            
     # return list of order_events
     def onTick(self, epoch):
         pass

@@ -37,14 +37,9 @@ class MySqlDB(db.DB):
 			raise
 
 	def truncateTable(self, tablename):
-		try:
-			cur = self.conn.cursor()
-			sql = "truncate table %s;" % tablename
-			return cur.execute(sql)
-		except Exception as e:
-			printError(sql)
-			raise e
-
+		sql = "truncate table %s;" % tablename
+		return self.execSql(sql)
+		
 	def countTable(self, tablename, whereList=[]):
 		strwhere = ""
 		if len(whereList) > 0:
@@ -107,4 +102,5 @@ WHERE (TABLE_SCHEMA = '%s') AND (TABLE_NAME = '%s');
 			return row
 
 
-	
+def execSql(sql):
+	return MySqlDB().execSql(sql)

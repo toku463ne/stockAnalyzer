@@ -2,7 +2,12 @@ import lib
 
 class Predictor(object):
     def initAttrFromArgs(self, args, name, default=None):
-        lib.initAttrFromArgs(self, args, name, default=default)
+        if name in args.keys():
+            setattr(self, name, args[name])
+        elif default is None:
+            raise Exception("%s is necessary!" % name)
+        else:
+            setattr(self, name, default)
         
     """
     Return pandas DataFrame with headers

@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS #TABLENAME# (
-    `km_groupid` VARCHAR(50),
+    `km_id` VARCHAR(60),
+    `km_setid` VARCHAR(40),
     `count` INT,
     `peak_count` INT,
     `meanx` FLOAT,
@@ -8,5 +9,5 @@ CREATE TABLE IF NOT EXISTS #TABLENAME# (
     `stdy` FLOAT,
     `last_epoch` FLOAT,
     #XYCOLUMS#,
-    PRIMARY KEY(`km_groupid`)
+    PRIMARY KEY(`km_id`, `km_setid`)
 );

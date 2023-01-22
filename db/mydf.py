@@ -56,3 +56,6 @@ class MyDf(db.DB):
         if df is None:
             raise Exception("couldn't get dataframe")
         return df
+
+def read_sql(sql):
+    return MyDf().read_sql(sql)

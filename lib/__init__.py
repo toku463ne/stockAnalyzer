@@ -73,11 +73,16 @@ def ensureDir(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-def initAttrFromArgs(self, args, name, default=None):
-    if name in args.keys():
-        setattr(self, name, args[name])
-    elif default is None:
-        raise Exception("%s is necessary!" % name)
-    else:
-        setattr(self, name, default)
+def ensureDataDir(data_dir="", subdir=""):
+    home = os.environ["HOME"]
+    if data_dir == "":
+        data_dir = "%s/%s" % (home, DEFAULT_DATA_DIR)
+    if data_dir[0] != "/":
+        data_dir = "%s/%s" % (home, data_dir)
+    if subdir != "":
+        data_dir += "/" + subdir
+    ensureDir(data_dir)
+    return data_dir
+
+
     
