@@ -9,9 +9,24 @@ import lib
 
 class TestZigzag(unittest.TestCase):
     def test_getData(self):
+        """
+        {
+    "codename": "2160.T",
+    "granularity": "D",
+    "start_date": "2022-05-01",
+    "end_date": "2022-12-01",
+    "indicators": {
+        
+        "zigzag5": {
+            "size": 5,
+            "type": "zigzag"
+        }
+    }
+}
+        """
         st = lib.dt2epoch(datetime(year=2022, month=6, day=1, hour=9))
-        ed = lib.dt2epoch(datetime(year=2022, month=11, day=1, hour=9))
-        t = Zigzag("2160.T", "D", st, ed, size=5)
+        ed = lib.dt2epoch(datetime(year=2022, month=10, day=31, hour=9))
+        t = Zigzag("2160.T", "D", st, ed, size=5, buffNbars=0)
         ep = lib.dt2epoch(datetime(year=2022, month=9, day=29, hour=9))
         self.assertTrue(t.tick(ep))
         self.assertEqual(t.zz_dt[t.curr_zi].month, 9)
@@ -51,12 +66,30 @@ class TestZigzag(unittest.TestCase):
         self.assertEqual(dts[-1].day, 28)
         self.assertEqual(dirs[-1], -2)
         
+        ep = lib.dt2epoch(datetime(year=2022, month=10, day=30, hour=9))
+        self.assertTrue(t.tick(ep))
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_ONLY_LAST_MIDDLE)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 10)
+        self.assertEqual(dts[-1].day, 26)
+        self.assertEqual(dirs[-1], 1)
+        
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_MIDDLE)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 10)
+        self.assertEqual(dts[-1].day, 26)
+        self.assertEqual(dirs[-1], 1)
 
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_COMPLETED)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 10)
+        self.assertEqual(dts[-1].day, 13)
+        self.assertEqual(dirs[-1], -2)
 
     def test_zigzag(self):
         st = lib.dt2epoch(datetime(year=2022, month=6, day=1, hour=9))
-        ed = lib.dt2epoch(datetime(year=2022, month=11, day=1, hour=9))
-        t = Zigzag("2160.T", "D", st, ed, size=5)
+        ed = lib.dt2epoch(datetime(year=2022, month=11, day=10, hour=9))
+        t = Zigzag("2160.T", "D", st, ed, size=5, buffNbars=0)
         self.assertEqual(t.zz_dt[3].month, 7)
         self.assertEqual(t.zz_dt[3].day, 4)
         self.assertEqual(t.zz_dirs[3], -2)
@@ -69,7 +102,26 @@ class TestZigzag(unittest.TestCase):
         self.assertEqual(t.zz_dt[9].month, 8)
         self.assertEqual(t.zz_dt[9].day, 16)
         self.assertEqual(t.zz_dirs[9], 2)
+
+        ep = lib.dt2epoch(datetime(year=2022, month=11, day=9, hour=9))
+        self.assertTrue(t.tick(ep))
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_ONLY_LAST_MIDDLE)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 11)
+        self.assertEqual(dts[-1].day, 7)
+        self.assertEqual(dirs[-1], -1)
         
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_MIDDLE)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 11)
+        self.assertEqual(dts[-1].day, 7)
+        self.assertEqual(dirs[-1], -1)
+
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_COMPLETED)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 10)
+        self.assertEqual(dts[-1].day, 26)
+        self.assertEqual(dirs[-1], 2)
 
         st = datetime(year=2022, month=9, day=1, hour=9).timestamp()
         ed = datetime(year=2022, month=12, day=1, hour=9).timestamp()        

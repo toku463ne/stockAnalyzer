@@ -7,8 +7,11 @@ import lib.naming as naming
 
 class Zigzag(Ticker):
     def loadData(self, ohlcv, startep, endep, use_master=True, size=5, middle_size=2):
-        (ep, _, _, _, _, _, _) = ohlcv
+        (ep, dt, _, h, l, _, _) = ohlcv
         self.ep = ep
+        self.dt = dt
+        self.h = h
+        self.l = l
         
         self._preinit(size, middle_size)
         db = MyDf(is_master=use_master)
@@ -55,9 +58,11 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
 
     def initData(self, ohlcv, size=5, middle_size=2):
         self._preinit(size, middle_size)
-        
         (ep, dt, _, h, l, _, _) = ohlcv
         self.ep = ep
+        self.dt = dt
+        self.h = h
+        self.l = l
         (self.zz_ep, 
             self.zz_dt, 
             self.zz_dirs, 
@@ -103,6 +108,47 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
             self.err = TICKER_NODATA
             return (0,None,0,0)
 
+        ep = self.ep
+        dt = self.dt
+        h = self.h
+        l = self.l
+
+        # True: must change the last peak
+        # False: don't need to change
+        def checkIfNeedChangeLastPeak():
+            last_peak = 0
+            last_dir = 0
+            last_peak_i = -1
+            if curr_zi < len(tick_indexes)-1:
+                return False, last_peak_i, last_peak, last_dir
+            if abs(self.zz_dirs[-1]) == 1:
+                return False, last_peak_i, last_peak, last_dir
+            if self.zz_dirs[-1] == 2:
+                min_peak = 0
+                min_j = -1
+                for j in range(tick_indexes[curr_zi]+1, len(ep)):
+                    if min_peak == 0 or l[j] < min_peak:
+                        min_peak = l[j]
+                        min_j = j
+                if min_j + self.middle_size < len(ep):
+                    last_peak = min_peak
+                    last_dir = -1
+                    last_peak_i = min_j
+                    return True, last_peak_i, last_peak, last_dir
+            if self.zz_dirs[-1] == -2:
+                max_peak = 0
+                max_j = -1
+                for j in range(tick_indexes[-1]+1, len(ep)):
+                    if max_peak == 0 or h[j] > max_peak:
+                        max_peak = h[j]
+                        max_j = j
+                if max_j + self.middle_size < len(ep):
+                    last_peak = max_peak
+                    last_dir = 1
+                    last_peak_i = max_j
+                    return True, last_peak_i, last_peak, last_dir
+            return False, last_peak_i, last_peak, last_dir
+
         if n == 1 and i >= 0:
             return (self.zz_ep[curr_zi], self.zz_dt[curr_zi], 
                     self.zz_dirs[curr_zi], self.zz_prices[curr_zi])
@@ -112,45 +158,60 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
                 curr_zj = curr_zi-n+1
                 if curr_zj < 0:
                     curr_zj = 0
-                return (self.zz_ep[curr_zj:curr_zi+1], self.zz_dt[curr_zj:curr_zi+1], 
+                need_change, last_peak_i, last_peak, last_dir = checkIfNeedChangeLastPeak()
+                if need_change:
+                    curr_zj += 1
+                    return (self.zz_ep[curr_zj:curr_zi+1] + [ep[last_peak_i]], 
+                            self.zz_dt[curr_zj:curr_zi+1] + [dt[last_peak_i]], 
+                            self.zz_dirs[curr_zj:curr_zi+1] + [last_dir], 
+                            self.zz_prices[curr_zj:curr_zi+1] + [last_peak])
+                else:
+                    return (self.zz_ep[curr_zj:curr_zi+1], self.zz_dt[curr_zj:curr_zi+1], 
                         self.zz_dirs[curr_zj:curr_zi+1], self.zz_prices[curr_zj:curr_zi+1])
             else:
-                ep = self.zz_ep
-                dt = self.zz_dt
-                drs = self.zz_dirs
-                prices = self.zz_prices
+                zz_ep = self.zz_ep
+                zz_dt = self.zz_dt
+                zz_drs = self.zz_dirs
+                zz_prices = self.zz_prices
                 new_ep = [0]*n
                 new_dt = [0]*n
                 new_drs = [0]*n
                 new_prices = [0]*n
                 if zz_mode == ZZ_MODE_RETURN_ONLY_LAST_MIDDLE:
-                    new_ep[-1] = ep[curr_zi]
-                    new_dt[-1] = dt[curr_zi]
-                    new_drs[-1] = drs[curr_zi]
-                    new_prices[-1] = prices[curr_zi]
+                    new_ep[-1] = zz_ep[curr_zi]
+                    new_dt[-1] = zz_dt[curr_zi]
+                    new_drs[-1] = zz_drs[curr_zi]
+                    new_prices[-1] = zz_prices[curr_zi]
                 curr_zj = curr_zi
                 if zz_mode == ZZ_MODE_RETURN_COMPLETED:
                     while curr_zj >= 0:
-                        if abs(drs[curr_zj]) == 2:
+                        if abs(zz_drs[curr_zj]) == 2:
                             break
                         curr_zj -= 1
-                    new_ep[-1] = ep[curr_zj]
-                    new_dt[-1] = dt[curr_zj]
-                    new_drs[-1] = drs[curr_zj]
-                    new_prices[-1] = prices[curr_zj]
+                    new_ep[-1] = zz_ep[curr_zj]
+                    new_dt[-1] = zz_dt[curr_zj]
+                    new_drs[-1] = zz_drs[curr_zj]
+                    new_prices[-1] = zz_prices[curr_zj]
 
                 curr_zj -= 1
                 j = 2
                 while curr_zj >= 0:
-                    if abs(drs[curr_zj]) == 2:
-                        new_ep[-j] = ep[curr_zj]
-                        new_dt[-j] = dt[curr_zj]
-                        new_drs[-j] = drs[curr_zj]
-                        new_prices[-j] = prices[curr_zj]
+                    if abs(zz_drs[curr_zj]) == 2:
+                        new_ep[-j] = zz_ep[curr_zj]
+                        new_dt[-j] = zz_dt[curr_zj]
+                        new_drs[-j] = zz_drs[curr_zj]
+                        new_prices[-j] = zz_prices[curr_zj]
                         j += 1
                         if j > n:
                             break
                     curr_zj -= 1
+                if zz_mode == ZZ_MODE_RETURN_ONLY_LAST_MIDDLE:
+                    need_change, last_peak_i, last_peak, last_dir = checkIfNeedChangeLastPeak()
+                    if need_change:
+                        return (self.zz_ep[-j+2:] + [ep[last_peak_i]], 
+                            self.zz_dt[-j+2:] + [dt[last_peak_i]], 
+                            self.zz_dirs[-j+2:] + [last_dir], 
+                            self.zz_prices[-j+2:] + [last_peak])
                 return (new_ep[-j+1:],new_dt[-j+1:],new_drs[-j+1:],new_prices[-j+1:])
 
         else:

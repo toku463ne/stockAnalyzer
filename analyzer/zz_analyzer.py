@@ -575,42 +575,43 @@ on duplicate key update
     def getNFeededYears(self):
         sql = """select count(*) from (
 select distinct year(FROM_UNIXTIME(startep)) year 
-from %s 
-where km_mode <= %d) a""" % (self.itemTable, ZZ_KMMODE_FEEDED)
+from %s g
+left join %s i on i.zzitemid = g.zzitemid
+where g.km_setid = '%s') a""" % (self.kmGroupsTable, self.itemTable, self.km_setid)
         (ycnt,) = self.redb.select1rec(sql)
         return ycnt
 
     """
     Deflection score is 
     """
-    def getDeflectedKmGroups(self, deflect_rate=0.65, 
-        min_cnt_a_year=10, km_mode=ZZ_KMMODE_FEEDED):
-        sql = """SELECT km_groupid, year(FROM_UNIXTIME(startep)) year,
-abs(last_dir) dir, 
-count(abs(last_dir)) cnt
-FROM %s
-where km_mode = %d
-group by km_groupid, year, dir
+    def getDeflectedKmGroups(self, deflect_rate=0.65, min_cnt_a_year=10):
+        sql = """SELECT g.km_id, year(FROM_UNIXTIME(i.startep)) year,
+abs(i.last_dir) dir, 
+count(abs(i.last_dir)) cnt
+FROM %s g
+left join %s i on i.zzitemid = g.zzitemid
+where g.km_setid = '%s'
+group by g.km_id, year, dir
 having cnt >= %d
-""" % (self.itemTable, km_mode, min_cnt_a_year)
+""" % (self.kmGroupsTable, self.itemTable, self.km_setid, min_cnt_a_year)
 
         df = self.df.read_sql(sql)
         df1 = df[df["dir"] == 1]
         df2 = df[df["dir"] == 2]
-        dfm = pd.merge(df1[["km_groupid","year", "cnt"]], 
-                df2[["km_groupid","year", "cnt"]], 
-                on=["km_groupid", "year"], how="outer").replace(np.nan, 0)
+        dfm = pd.merge(df1[["km_id","year", "cnt"]], 
+                df2[["km_id","year", "cnt"]], 
+                on=["km_id", "year"], how="outer").replace(np.nan, 0)
         dfm["total"] = dfm["cnt_x"]+dfm["cnt_y"]
         dfm["r1"]  = dfm["cnt_x"]/dfm["total"]
 
-        dftotal = dfm.groupby(["km_groupid"]).count()[["total"]]
-        df1 = dfm[dfm["r1"] >= deflect_rate].groupby(["km_groupid"]).count()[["total"]]
-        df2 = dfm[dfm["r1"] <= 1-deflect_rate].groupby(["km_groupid"]).count()[["total"]]
+        dftotal = dfm.groupby(["km_id"]).count()[["total"]]
+        df1 = dfm[dfm["r1"] >= deflect_rate].groupby(["km_id"]).count()[["total"]]
+        df2 = dfm[dfm["r1"] <= 1-deflect_rate].groupby(["km_id"]).count()[["total"]]
         df1 = df1.rename(columns={"total": "total1"})
         df2 = df2.rename(columns={"total": "total2"})
 
-        df = pd.merge(dftotal, df1, on=["km_groupid"], how="outer").replace(np.nan, 0)
-        df = pd.merge(df, df2, on=["km_groupid"], how="outer").replace(np.nan, 0)
+        df = pd.merge(dftotal, df1, on=["km_id"], how="outer").replace(np.nan, 0)
+        df = pd.merge(df, df2, on=["km_id"], how="outer").replace(np.nan, 0)
         df["score1"] = df["total1"]/df["total"]
         df["score2"] = df["total2"]/df["total"]
 
