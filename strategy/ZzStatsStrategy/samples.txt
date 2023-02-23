@@ -1,0 +1,44 @@
+test2	20	3288.T	lose	-26247.2	1	100	1629714831	
+2021-08-23 10:33:51	5049.18	1629158400	2021-08-17 00:00:00	122111_0000000002	
+5111.87	4786.71	4786.71	1629244800	2021-08-18 00:00:00	stoploss
+{
+    "codename": "3288.T",
+    "granularity": "D",
+    "start_date": "2021-06-01",
+    "end_date": "2021-10-01",
+    "indicators": {
+        "zigzag5": {
+            "size": 5,
+            "type": "zigzag"
+        }
+    }
+}
+
+[lose]21: 20210916-20211019 code=3053.T open=379.333333 close=377.000000 side=1 desc=011121_0000000004
+{
+    "codename": "3053.T",
+    "granularity": "D",
+    "start_date": "2021-08-01",
+    "end_date": "2021-11-01",
+    "indicators": {
+        "zigzag5": {
+            "size": 5,
+            "type": "zigzag"
+        }
+    }
+}
+
+[lose]15: 20210813-20210820 code=4544.T open=2953.046667 close=2996.800000 side=-1 desc=011121_0000000004
+{
+    "codename": "4544.T",
+    "granularity": "D",
+    "start_date": "2021-06-01",
+    "end_date": "2021-10-01",
+    "indicators": {
+        "zigzag5": {
+            "size": 5,
+            "type": "zigzag"
+        }
+    }
+}
+     

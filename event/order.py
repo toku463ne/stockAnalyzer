@@ -2,17 +2,18 @@ from consts import *
 import random
 
 class OrderEvent(object):
-    def __init__(self, cmd, data_getter, _id=-1, epoch=0, side=0, 
+    def __init__(self, cmd, data_getter=None, _id=-1, epoch=0, side=0, 
                  units=0, validep=0,
         price=0, takeprofit=0, stoploss=0, expiration=0, desc=""):
         self.dg = data_getter
         self.id= _id
-        self.localId = "%d-%d" % (epoch, random.randint(10000000, 99999999))
+        if data_getter != None:
+            self.localId = "%s-%d-%d" % (data_getter.codename, epoch, random.randint(10000000, 99999999))
+            self.codename = data_getter.codename
+            self.granularity = data_getter.granularity
         self.epoch = epoch
         self.type = EVETYPE_ORDER
         self.side = side
-        self.codename = data_getter.codename
-        self.granularity = data_getter.granularity
         self.cmd = cmd
         if cmd == CMD_CANCEL and _id == -1:
             raise Exception("Need id for cancel orders!")

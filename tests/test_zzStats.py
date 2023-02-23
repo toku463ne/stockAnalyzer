@@ -4,83 +4,84 @@ import unittest
 from strategy.ZzStatsStrategy import ZzStatsStrategy
 import lib
 import lib.tradelib as tradelib
-from time_ticker import TimeTicker
-from executor import Executor
-from trade_manager import TradeManager
-from portforio import Portoforio
+import lib.backtests as backtests
 from consts import *
 from db.mysql import MySqlDB
 
+name = "test6"   
+"""
+SELECT year(open_datetime) y, month(open_datetime) m, 
+sum(profit) p, count(profit) c
+FROM `trades`
+where trade_name = 'test6'
+group by y, m;
+
+select sum(profit) total_profit, 
+sum(if(profit>0,1,0)) wins, sum(if(profit<0,1,0)) loses 
+from trades
+where trade_name = 'test6';
+"""
+
+def run_backtest(name, st, ed, os, buy_budget, sell_budget, profit):
+    granularity = "D"
+    args = {"granularity": granularity, 
+        "min_profit": profit,
+        "max_fund": 200000,
+        "trade_mode": TRADE_MODE_BOTH,
+        "km_setname": "km20110101000020201231000096964fd8ed"
+    }
+    
+    #args["codenames"] = []
+    sql = """SELECT distinct i.codename FROM stockanalyzer.anal_zzitems_D_5_5 i
+left join stockanalyzer.anal_zzkmgroups_D_5_5 g on i.zzitemid = g.zzitemid
+where g.km_setid = 1
+and g.km_id in
+('212122_0000000007','212111_0000000007','212222_0000000007','121111_0000000003','121211_0000000006')
+and i.codename in 
+(select distinct codename 
+    FROM stockanalyzer.anal_zzcode_D c
+    where obsyear = 2020 and min_nth_volume >= 100000)
+order by rand()
+limit 100
+;"""
+    codenames = []
+    for (codename,) in MySqlDB().execSql(sql):
+        codenames.append(codename)
+    
+    
+    #codenames = ['8715.T','1720.T','6473.T','8359.T','6997.T','6993.T','2586.T','6058.T','2002.T','1407.T','4436.T','9042.T','2587.T','3665.T','8616.T','9119.T',
+    #'6902.T','4324.T','7747.T','3661.T','6754.T','7951.T','6544.T','8005.T','6981.T','2501.T','5929.T','4599.T','4921.T','8233.T','8016.T','6740.T','9107.T','6481.T',
+    #'6755.T','7186.T','6592.T','3407.T','4042.T','2267.T','6586.T','9468.T','6701.T','5721.T','2489.T','2337.T','4568.T','9719.T','4062.T','9513.T','8304.T','6268.T',
+    #'4704.T','8088.T','5631.T','5938.T','5110.T','9501.T','4151.T','2440.T','9404.T','6871.T','9424.T','2315.T','9735.T','3088.T','9505.T','7261.T','7201.T','7545.T',
+    #'5706.T','2914.T','6632.T','6383.T','7276.T','3635.T','3659.T','4974.T','8830.T','6305.T','9301.T','9399.T','9502.T','2229.T','8306.T','4714.T','2371.T','9684.T',
+    #'6804.T','3048.T','1973.T','8804.T','3865.T','8056.T','7984.T','7167.T','8918.T','9603.T','9532.T','7616.T',]
+    
+    #codenames = ["1911.T"]
+    args["codenames"] = codenames
+
+    
+    
+    #args["codenames"] = ['9997.T']
+    #args["codenames"] = []
+    
+    args["market"] = "prime"
+    strategy = ZzStatsStrategy(args, use_master=True, load_zzdb=True)
+    # name, interval, startep, endep, strategy, orderstopep=0, buy_budget=1000000, sell_budget=1000000
+    report = backtests.runBacktest(name, granularity, st, ed, strategy, orderstopep=os,
+            buy_budget=buy_budget, sell_budget=buy_budget)
+    return report
+
+
 class TestZzStatsStrategy(unittest.TestCase):
-
-    def _run(self, st, ed, os, buy_budget, sell_budget, profit):
-        granularity = "D"
-        args = {"codenames": ["^N225", "1332.T", "1379.T", 
-        "1716.T", "1720.T", "1973.T", "2121.T", "2160.T",
-        "2695.T", "2923.T", "3001.T",
-        "3092.T", "3197.T", 
-        "4080.T", "4337.T", 
-        "5020.T", "5108.T", 
-        "6042.T", "6360.T", "7014.T", "7150.T", "7157.T",
-        "7175.T", "7203.T", "8001.T", "8002.T", "8244.T",
-        "8306.T", "8308.T", 
-        "9005.T", "9066.T", ], 
-            "granularity": granularity, 
-            "min_profit": profit,
-            "min_km_count": 5,
-            "max_std": 0.3,
-            "max_fund": 10000000,
-            "trade_mode": TRADE_MODE_BOTH,
-            "kmpkl_file": "/home/ubuntu/stockanaldata/zz/km_2010-2020.pkl"}
-        #    "kmpkl_file": "tests/test_zzStats.d/km_2015-2021.pkl"}
-        
-        #args["codenames"] = []
-        sql = """SELECT distinct codename FROM stockanalyzer.anal_zzitems_D_5_5
-where year(from_unixtime(startep)) >= 2021
-and km_groupid in
-('0011-0000000001', '0011-0000000002', '0022-0000000000',
-       '0022-0000000001', '0022-0000000003', '0200-0000000000',
-       '0200-0000000002', '0211-0000000003', '1110-0000000000',
-       '1110-0000000001', '1110-0000000002', '1110-0000000003',
-       '1111-0000000002', '1112-0000000000', '1210-0000000000',
-       '1210-0000000001', '1210-0000000002', '1210-0000000003',
-       '1212-0000000000', '1212-0000000001', '1212-0000000003',
-       '2011-0000000003', '2120-0000000000', '2120-0000000001',
-       '2120-0000000002', '2120-0000000003', '2121-0000000000',
-       '2121-0000000001', '2121-0000000003', '2201-0000000002',
-       '2220-0000000000', '2220-0000000001', '2220-0000000002',
-       '2220-0000000003', '2221-0000000003', '2222-0000000003');"""
-
-        codenames = []
-        for (codename,) in MySqlDB().execSql(sql):
-            codenames.append(codename)
-        args["codenames"] = codenames
-
-        
-        
-        #args["codenames"] = ['9997.T']
-        #args["codenames"] = []
-        
-        args["market"] = "prime"
-        strategy = ZzStatsStrategy(args, use_master=True, load_zzdb=True)
-        ticker = TimeTicker(tradelib.getUnitSecs(granularity), st, ed)
-        executor = Executor()
-        portforio = Portoforio("zzstats_test6",buy_budget, sell_budget)
-        tm = TradeManager("zigzag stats strategy", 
-            ticker, strategy, executor, portforio)
-        report = tm.run(orderstopep=os)
-
-        return report
-
-
     def testCase1(self):
         st = lib.str2epoch("2021-01-01T00:00:00") 
         ed = lib.str2epoch("2022-12-01T00:00:00")
         os = lib.str2epoch("2022-11-20T00:00:00")
-        report = self._run(st, ed, os, 1000000, 1000000, 10000)
-        self.assertEqual(report["trade_count"],30)
-        self.assertEqual(report["codename"],"^N225")
-        self.assertGreater(report["sell_offline"], 0)
+        # name, st, ed, os, buy_budget, sell_budget, profit
+        report = run_backtest(name, st, ed, os, 1000000, 1000000, 10000)
+        #self.assertEqual(report["trade_count"],30)
+        #self.assertEqual(report["codename"],"^N225")
+        #self.assertGreater(report["sell_offline"], 0)
 
         #print(report)
         #import json

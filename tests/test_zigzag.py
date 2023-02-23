@@ -86,6 +86,31 @@ class TestZigzag(unittest.TestCase):
         self.assertEqual(dts[-1].day, 13)
         self.assertEqual(dirs[-1], -2)
 
+        """
+{
+    "codename": "4587.T",
+    "granularity": "D",
+    "start_date": "2021-03-01",
+    "end_date": "2021-07-30",
+    "indicators": {
+        "zigzag5": {
+            "size": 5,
+            "type": "zigzag"
+        }
+    }
+}
+        """
+        st = lib.dt2epoch(datetime(2021, 3, 1))
+        ed = lib.dt2epoch(datetime(2021, 7, 5))
+        t = Zigzag("4587.T", "D", st, ed, size=5, buffNbars=0)
+        self.assertTrue(t.tick(ed))
+        (_, dts, dirs, _) = t.getData(n=5, zz_mode=ZZ_MODE_RETURN_ONLY_LAST_MIDDLE)
+        self.assertEqual(len(dts), 5)
+        self.assertEqual(dts[-1].month, 6)
+        self.assertEqual(dts[-1].day, 30)
+        self.assertEqual(dirs[-1], 1)
+
+
     def test_zigzag(self):
         st = lib.dt2epoch(datetime(year=2022, month=6, day=1, hour=9))
         ed = lib.dt2epoch(datetime(year=2022, month=11, day=10, hour=9))

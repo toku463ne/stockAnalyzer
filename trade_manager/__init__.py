@@ -1,5 +1,6 @@
 from env import *
 from consts import *
+import copy
 
 class TradeManager(object):
     def __init__(self, name,
@@ -56,6 +57,7 @@ class TradeManager(object):
 
     
     def receiveOrder(self, epoch, orderEvent):
+        _id = orderEvent.id
         if orderEvent.cmd in [CMD_CREATE_STOP_ORDER,
                             CMD_CREATE_LIMIT_ORDER,
                             CMD_CREATE_MARKET_ORDER]:
@@ -72,11 +74,23 @@ class TradeManager(object):
                 orderEvent.cmd = CMD_ORDER_ERROR
                 return False
 
+        if orderEvent.cmd == CMD_CANCEL:
+            if _id in self.orders.keys():
+                self.orders[_id].cmd = CMD_CANCEL
+                return True
+            else:
+                orderEvent.error_msg = "Tried to cancel a non existing order %s" % (str(_id))
+                orderEvent.cmd = CMD_ORDER_ERROR
+                return False
+            
+            #del self.orders[_id]
+
         if self.executor.checkOrder(epoch, orderEvent) == False:
             return False
-        orderEvent.setId(self.genId())
-        self.trans.append(orderEvent)
-        orderEvent = self.trans.pop()
+        if orderEvent.id == -1:
+            orderEvent.setId(self.genId())
+        #self.trans.append(orderEvent)
+        #orderEvent = self.trans.pop()
         _id = orderEvent.id
         if _id in self.orders.keys():
             if orderEvent.cmd != CMD_CANCEL:
@@ -97,11 +111,21 @@ class TradeManager(object):
 
     def checkEvents(self, epoch):
         signal_events = []
+        ids = []
         for _id in self.orders.keys():
+            ids.append(_id)
+
+        for _id in ids:
             orderEvent = self.orders[_id]
-            signal = self.executor.detectOrderChange(epoch, orderEvent)
+            signal = None
+            if orderEvent.cmd == CMD_CANCEL:
+                signal = self.executor.cancelOrder(epoch, orderEvent)
+            else:
+                signal = self.executor.detectOrderChange(epoch, orderEvent)
             if signal != None:
                 signal_events.append(signal)
+            if orderEvent.status in [ESTATUS_ORDER_CLOSED, ESTATUS_TRADE_CLOSED]:
+                del self.orders[_id]
 
         return signal_events
 

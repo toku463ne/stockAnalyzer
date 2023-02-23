@@ -52,8 +52,8 @@ class Strategy(object):
         #order.openTrade(epoch, price, desc)
         return order
         
-    def cancelOrder(self, _id):
-        return OrderEvent(_id, CMD_CANCEL)
+    def cancelOrder(self, epoch, data_getter, _id):
+        return OrderEvent(CMD_CANCEL, epoch=epoch, _id=_id)
           
           
     def getPlotElements(self, color="k"):

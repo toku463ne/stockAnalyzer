@@ -1,6 +1,7 @@
 # Do NOT import env
 import datetime, calendar, time, pytz, tzlocal
 import os
+import shutil
 import math
 import numpy as np
 unix_epoch = np.datetime64(0, 's')
@@ -72,6 +73,10 @@ def mergeJson(j1, j2):
 def ensureDir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+def removeDir(path):
+    if os.path.exists(path):
+        shutil.rmtree(path)
 
 def ensureDataDir(data_dir="", subdir=""):
     home = os.environ["HOME"]

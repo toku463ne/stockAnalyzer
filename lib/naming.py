@@ -38,16 +38,27 @@ def getZzKmStatsTableName(granularity, zz_size, n_points):
     return "anal_zzkmstats_%s_%d_%d" % (granularity, zz_size, n_points)
 
 def getZzKmGroupsTableName(granularity, zz_size, n_points):
-        return "anal_zzkmgroups_%s_%d_%d" % (granularity, zz_size, n_points)
+    return "anal_zzkmgroups_%s_%d_%d" % (granularity, zz_size, n_points)
 
 def getZzKmGroupsPredictedTableName(granularity, zz_size, n_points):
-        return "anal_zzkmgroups_predicted_%s_%d_%d" % (granularity, zz_size, n_points)
+    return "anal_zzkmgroups_predicted_%s_%d_%d" % (granularity, zz_size, n_points)
 
-def getZzKmSetId(startep, endep, codenames):
+def getZzCandleTableName(granularity, n_points, n_candles):
+    return "anal_zzcandles_%s_%d_%d" % (granularity, n_points, n_candles)
+
+def getZzKmCandleStatsTableName(granularity, zz_size, n_candles):
+    return "anal_zzkmcandlestats_%s_%d_%d" % (granularity, zz_size, n_candles)
+
+def getZzKmCandlePredictedTableName(granularity, n_points, n_candles):
+    return "anal_zzcandles_predicted_%s_%d_%d" % (granularity, n_points, n_candles)
+
+def getZzKmSetName(startep, endep, codenames, subname=""):
     import hashlib
     start = lib.epoch2str(startep, "%Y%m%d%H%M")
     end = lib.epoch2str(endep, "%Y%m%d%H%M")
     codestr = "".join(codenames)
     h = hashlib.sha256(codestr.encode()).hexdigest()[:10]
-    return "km%s%s%s" % (start, end, h)
+    return "km%s%s%s%s" % (subname, start, end, h)
 
+def getKmCandleName():
+    return "candles"

@@ -4,12 +4,14 @@ class Executor(object):
     def cancelOrder(self, epoch, orderEvent):
         (_, _, _, h, l, c, _) = orderEvent.getPrice(epoch)
         price = (h+l+c)/3
-        
         if orderEvent.status == ESTATUS_ORDER_OPENED:
             orderEvent.closeOrder(epoch, "Order cancel")
         if orderEvent.status == ESTATUS_TRADE_OPENED:
             orderEvent.closeTrade(epoch, price, "Trade cancel")
-    
+        orderEvent.cmd = CMD_CANCEL
+        return orderEvent
+        
+
 
     def checkOrder(self, epoch, orderEvent):
         (_, _, _, h, l, c, _) = orderEvent.getPrice(epoch)
@@ -33,8 +35,7 @@ class Executor(object):
         expr = orderEvent.expiration
 
         if orderEvent.cmd == CMD_CANCEL:
-            self.executor.cancelOrder(epoch, orderEvent)
-            return orderEvent
+            return
         
         if orderEvent.status == ESTATUS_ORDER_OPENED:
             if orderEvent.cmd == CMD_CREATE_MARKET_ORDER:
