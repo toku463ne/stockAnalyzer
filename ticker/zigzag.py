@@ -6,7 +6,28 @@ from db.mydf import MyDf
 import lib.naming as naming
 
 class Zigzag(Ticker):
-    def loadData(self, ohlcv, startep, endep, use_master=True, size=5, middle_size=2):
+    def __init__(self, config):
+        super(Zigzag, self).__init__(config)
+        
+        self.initAttrFromArgs(config, "size", 5)
+        self.initAttrFromArgs(config, "middle_size", 2)
+        self.curr_zi = -1
+        self.last_i = -1
+        self.pos = 0
+        self.tick_indexes = []
+        
+        zzTableName = naming.getZigzagTableName(self.granularity, self.size, self.middle_size)
+        self.ensureTable(zzTableName, "tick_zigzag")
+
+        if self.startep > 0 or self.endep > 0:
+            self.initData()
+        
+        
+
+    def _loadData(self, ohlcv, startep, endep):
+        use_master = self.use_master
+        size = self.size
+        middle_size = self.middle_size
         (ep, dt, o, h, l, c, v) = ohlcv
         self.ep = ep
         self.dt = dt
@@ -17,40 +38,125 @@ class Zigzag(Ticker):
         self.v = v
         self.last_i = -1
         
-        self._preinit(size, middle_size)
         db = MyDf(is_master=use_master)
         sql = """select ep, dt, dir, p, v, dist from %s
 where codename='%s'  
-and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self.size),
+and ep >= %d and ep <= %d""" % (self.table,
         self.codename,
         startep, endep)
         df = db.read_sql(sql)
-        self.zz_ep = df["ep"].tolist()
+        zz_ep = df["ep"].tolist()
+        self.zz_ep = zz_ep
+
         dt = []
         for dt64 in df.dt.values:
             dt.append(lib.npdt2dt(dt64))
-        self.zz_dt = dt
-        self.zz_dirs = df["dir"].tolist()
-        self.zz_prices = df["p"].tolist()
-        self.zz_v = df["v"].tolist()
-        self.zz_dists = df["dist"].tolist()
 
-        self._postinit(ep)
+        zz_dt = dt
+        zz_dirs = df["dir"].tolist()
+        zz_prices = df["p"].tolist()
+        zz_v = df["v"].tolist()
+        zz_dists = df["dist"].tolist()
 
-    def _preinit(self, size=5, middle_size=2):
-        self.updated = False
-        self.size = size
-        self.middle_size = middle_size
-        self.curr_zi = -1
+        self.zz_dt = zz_dt 
+        self.zz_dirs = zz_dirs 
+        self.zz_prices = zz_prices 
+        self.zz_v = zz_v
+        self.zz_dists = zz_dists 
+
+        return zz_ep, zz_dt, zz_prices, zz_v, zz_dirs, zz_dists
+
+
+    def calcTickValues(self, ohlcv, size=5, middle_size=2):
         self.last_i = -1
-        self.pos = 0
-        self.tick_indexes = []
+        codename = self.codename
+        (ep, dt, o, h, l, c, v) = ohlcv
+
+        load_db = False
+        startep = ep[0]
+        endep = ep[-1]
+        tableep_res = self.getTableEp()
+        if tableep_res != None:
+            (db_startep, db_endep) = tableep_res
+            if startep > db_endep + self.unitsecs:
+                raise Exception("Cannot save non continuous data to DB. startdt must be less than %s" % (lib.epoch2dt(db_endep+self.unitsecs)))
+            
+            if endep < db_startep - self.unitsecs:
+                raise Exception("Cannot save non continuous data to DB. enddt must be more than %s" % (lib.epoch2dt(endep+selt.unitsecs)))
+        
+            # only load db when the range is inside what exist in DB for simplicity
+            if startep >= db_startep and endep <= db_endep:
+                load_db = True
+        else:
+            load_db = True
 
 
-    def _postinit(self, ep):
+        self.ep = ep
+        self.dt = dt
+        self.o = o
+        self.h = h
+        self.l = l
+        self.c = c
+        self.v = v
+
+        zz_ep = []
+        zz_dt = []
+        zz_prices = []
+        zz_v = []
+        zz_dirs = []
+        zz_dists = []
+        if load_db:
+            zz_ep, zz_dt, zz_prices, zz_v, zz_dirs, zz_dists = self._loadData(ohlcv, startep, endep)
+
+
+        if len(zz_ep) == 0:
+            (zz_ep, 
+            zz_dt, 
+            zz_dirs, 
+            zz_prices, 
+            zz_v,
+            zz_dists, 
+            _) = libind.zigzag(ep, dt, h, l, v, size, middle_size=middle_size)
+
+            self.zz_ep = zz_ep
+            self.zz_dt = zz_dt 
+            self.zz_dirs = zz_dirs 
+            self.zz_prices = zz_prices 
+            self.zz_v = zz_v
+            self.zz_dists = zz_dists 
+        
+
+        if self.save_db and load_db == False:
+            lenep = len(zz_ep)
+            def insertDB(i, startep, endep):
+                while i < lenep and zz_ep[i] < startep:
+                    i += 1
+                while i < lenep and zz_ep[i] <= endep:
+                    sql = """replace into 
+%s(codename, EP, DT, P, V, dir, dist) 
+values('%s', %d, '%s', %f, %f, %d, %d);""" % (self.table, 
+                    codename, zz_ep[i], zz_dt[i], zz_prices[i], zz_v[i], zz_dirs[i], zz_dists[i])
+                    self.updb.execSql(sql)
+                    i += 1
+                return i
+
+            i = -1
+            if tableep_res == None:
+                i = insertDB(0, startep, endep)
+            else:
+                if zz_ep[0] < db_startep:
+                    i = insertDB(0, zz_ep[0], db_startep-self.unitsecs)
+                    startep = zz_ep[0]
+                if db_endep < zz_ep[-1]:
+                    i = insertDB(i, db_endep+self.unitsecs, zz_ep[-1])
+                    endep = zz_ep[-1]
+
+            if i > 0: # there was an update
+                self.updateTableEp(startep, endep)
+
+
         tick_indexes = []
         ti = 0
-        zz_ep = self.zz_ep
         for zi in range(len(zz_ep)):
             ze = zz_ep[zi]
             while True:
@@ -62,26 +168,6 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
                 ti += 1
         self.tick_indexes = tick_indexes
 
-    def initData(self, ohlcv, size=5, middle_size=2):
-        self._preinit(size, middle_size)
-        self.last_i = -1
-        (ep, dt, o, h, l, c, v) = ohlcv
-        self.ep = ep
-        self.dt = dt
-        self.o = o
-        self.h = h
-        self.l = l
-        self.c = c
-        self.v = v
-        (self.zz_ep, 
-            self.zz_dt, 
-            self.zz_dirs, 
-            self.zz_prices, 
-            self.zz_v,
-            self.zz_dists, 
-            _) = libind.zigzag(ep, dt, h, l, v, size, middle_size=middle_size)
-
-        self._postinit(ep)
 
     def getCurrOhlcv(self):
         if self.last_i == -1:
@@ -98,8 +184,6 @@ and ep >= %d and ep <= %d""" % (naming.getZzDataTableName(self.granularity, self
         return (self.ep[j:i+1],self.dt[j:i+1],self.o[j:i+1],
                 self.h[j:i+1],self.l[j:i+1],self.c[j:i+1],self.v[j:i+1])
 
-        
-        
 
 
     def getData(self, i=-1, n=1, zz_mode=ZZ_MODE_RETURN_ONLY_LAST_MIDDLE, do_update_flag_change=True):

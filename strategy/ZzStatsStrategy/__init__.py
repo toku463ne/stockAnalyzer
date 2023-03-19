@@ -12,6 +12,7 @@ import copy
 
 min_profit = 10000
 zz_size = 5
+zz_middle_size = 2
 n_points = 5
 min_trade_len = 5
 max_fund = 100000
@@ -22,26 +23,28 @@ trade_mode = TRADE_MODE_BOTH
 
 class ZzStatsStrategy(Strategy):
     
-    def __init__(self, args, use_master=False, load_zzdb=False):
-        self.initAttrFromArgs(args, "granularity")
-        self.initAttrFromArgs(args, "km_setname")
-        self.initAttrFromArgs(args, "n_points", n_points)
-        self.initAttrFromArgs(args, "zz_size", zz_size)
+    def __init__(self, config):
+        self.initAttrFromConfig(config, "granularity")
+        self.initAttrFromConfig(config, "classifier")
+        self.initAttrFromConfig(config, "n_points", n_points)
+        self.initAttrFromConfig(config, "zz_size", zz_size)
+        self.initAttrFromConfig(config, "zz_middle_size", zz_middle_size)
         self.unitsecs = tradelib.getUnitSecs(self.granularity)
-        self.initAttrFromArgs(args, "min_profit", min_profit)
-        self.initAttrFromArgs(args, "min_trade_len", min_trade_len)
-        self.initAttrFromArgs(args, "max_fund", max_fund)
-        self.initAttrFromArgs(args, "min_unit", min_unit)
-        self.initAttrFromArgs(args, "min_volume", min_volume)
-        self.initAttrFromArgs(args, "market", "")
-        self.initAttrFromArgs(args, "max_trades_a_day", max_trades_a_day)
-        self.initAttrFromArgs(args, "trade_mode", trade_mode)
-        self.load_zzdb = load_zzdb
+        self.initAttrFromConfig(config, "min_profit", min_profit)
+        self.initAttrFromConfig(config, "min_trade_len", min_trade_len)
+        self.initAttrFromConfig(config, "max_fund", max_fund)
+        self.initAttrFromConfig(config, "min_unit", min_unit)
+        self.initAttrFromConfig(config, "min_volume", min_volume)
+        self.initAttrFromConfig(config, "market", "")
+        self.initAttrFromConfig(config, "max_trades_a_day", max_trades_a_day)
+        self.initAttrFromConfig(config, "trade_mode", trade_mode)
+        self.initAttrFromConfig(config, "use_master", False)
 
         self.tickers = {}
-        self.predictor = ZzPredictor(config=args)
+        self.predictor = ZzPredictor(config=config)
         self.codenames = self.predictor.codenames
         self.orders = {}
+        self.config = config
 
 
     def preProcess(self, timeTicker, portforio):
@@ -50,8 +53,16 @@ class ZzStatsStrategy(Strategy):
         startep = timeTicker.startep - self.n_points * self.zz_size * 3 * self.unitsecs
         endep = timeTicker.endep
         for codename in self.codenames:
-            self.tickers[codename] = Zigzag(codename, granularity, 
-                    startep, endep=endep, size=zz_size, load_db=self.load_zzdb)
+            config = {
+                "codename": codename,
+                "granularity": self.granularity,
+                "startep": startep,
+                "endep": endep,
+                "size": self.zz_size,
+                "middle_size": self.zz_middle_size
+            }
+            z = Zigzag(config)
+            self.tickers[codename] = z
         
 
         

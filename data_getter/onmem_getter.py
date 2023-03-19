@@ -112,6 +112,8 @@ class OnMemGetter(DataGetter):
                         endep = ep[i]
 
         starti = self.getIndex(startep)
+        if starti == -1:
+            starti = 0
         endi = self.getIndex(endep)
 
         if len(self.ep) >= self.memSize + self.extendSize:
@@ -132,9 +134,12 @@ class OnMemGetter(DataGetter):
                 self.resetIndex()
                 starti = self.getIndex(startep)
                 endi = self.getIndex(endep)
-        return (self.ep[starti:endi+1], self.dt[starti:endi+1], 
-            self.o[starti:endi+1], self.h[starti:endi+1], 
-            self.l[starti:endi+1], self.c[starti:endi+1], self.v[starti:endi+1])
+        if starti == 0 and endi == -1:
+            return (self.ep, self.dt, self.o, self.h, self.l, self.c, self.v)
+        else:
+            return (self.ep[starti:endi+1], self.dt[starti:endi+1], 
+                self.o[starti:endi+1], self.h[starti:endi+1], 
+                self.l[starti:endi+1], self.c[starti:endi+1], self.v[starti:endi+1])
 
     def resetIndex(self):
         ep = self.ep

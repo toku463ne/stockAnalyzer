@@ -41,6 +41,8 @@ class MySqlDB(db.DB):
 		return self.execSql(sql)
 		
 	def countTable(self, tablename, whereList=[]):
+		if self.tableExists(tablename) == False:
+			return 0
 		strwhere = ""
 		if len(whereList) > 0:
 			strwhere = "where %s" % (" and ".join(whereList))
@@ -100,7 +102,17 @@ WHERE (TABLE_SCHEMA = '%s') AND (TABLE_NAME = '%s');
 		cur.close()
 		if row:
 			return row
+		return None
 
+	def select1value(self, tableName, field, whereList):
+		strwhere = ""
+		strwhere = "where %s" % (" and ".join(whereList))
+		sql = "select %s as cnt from %s %s" % (field, tableName, strwhere)
+		row = self.select1rec(sql)
+		if row:
+			(val,) = row
+			return val
+		return None
 
 def execSql(sql):
 	return MySqlDB().execSql(sql)

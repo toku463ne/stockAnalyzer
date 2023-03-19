@@ -4,39 +4,114 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import data_getter
 from event.tick import TickEvent
 from consts import *
+from db.mysql import MySqlDB
+import lib
 
 class Ticker(object):
-    def __init__(self, codename, granularity, 
-        startep, endep=0, buffNbars=100, load_db=False, use_master=True, **args):
-        self.codename = codename
-        self.granularity = granularity
-        self.buffNbars = buffNbars
+    def __init__(self, config):
+        self.initAttrFromArgs(config, "codename")
+        self.initAttrFromArgs(config, "granularity")
+        self.initAttrFromArgs(config, "startep", 0)
+        self.initAttrFromArgs(config, "endep", 0)
+        self.initAttrFromArgs(config, "buffNbars", 100)
+        self.initAttrFromArgs(config, "use_master", False)
+        self.initAttrFromArgs(config, "save_db", False)
+        self.initAttrFromArgs(config, "recreate", False)
+        
+
         dg = data_getter.getDataGetter(self.codename, self.granularity)
         self.dg = dg
         self.unitsecs = dg.unitsecs
-        self.args = args
-        self._resetData(startep, endep, load_db=load_db, use_master=use_master)
+        self.redb = MySqlDB(is_master=self.use_master)
+        self.updb = MySqlDB(is_master=self.use_master)
 
-    def _resetData(self, startep, endep=0, load_db=False, use_master=True):
+        if self.redb.tableExists("tick_tableeps") == False:
+            self.updb.createTable("tick_tableeps", "tick_tableeps")
+
+        self.err = TICKER_ERR_NONE
+        
+        #self.initData()
+
+    
+    def initData(self):
+        self._resetData(self.startep, self.endep, use_master=self.use_master)
+    
+
+    def ensureTable(self, tableName, tableTemplateName="", replacements={}):
+        self.tableTemplate = tableTemplateName
+        self.table = tableName
+        if self.recreate:
+            self.dropTable()
+
+        self.tableReplacements = replacements
+        if self.redb.tableExists(tableName) == False:
+            self.updb.createTable(tableName, tableTemplateName, replacements)
+        
+
+
+
+    def dropTable(self):
+        sql = "delete from tick_tableeps where table_name = '%s' and codename = '%s';" % (self.table, self.codename)
+        self.updb.execSql(sql)
+        self.updb.dropTable(self.table)
+
+
+
+    def _resetData(self, startep, endep=0, use_master=True):
         if endep == 0:
             endep = startep + self.unitsecs*self.buffNbars
         else:
             endep += self.unitsecs*self.buffNbars
         ohlcv = self.dg.getPrices(startep, endep)
-        if load_db:
-            self.loadData(ohlcv, startep, endep, use_master=use_master, **self.args)
-        else:
-            self.initData(ohlcv, **self.args)
+        #if load_db:
+        #   self.loadData(ohlcv, startep, endep, use_master=use_master)
+        #else:
+        #    self.initData(ohlcv)
+        self.calcTickValues(ohlcv)
         self.index = -1
         self.err = TICKER_ERR_NONE
         self.data = None
 
     # must inherit
-    def loadData(startep, endep, use_master=True, **args):
+    def loadData(startep, endep, use_master=True):
         pass
 
+
+    def getTableEp(self):
+        sql = "select startep, endep from tick_tableeps where table_name='%s' and codename='%s';" % (self.table, self.codename)
+        res = self.redb.select1rec(sql)
+        if res == None:
+            return None
+        (startep, endep) = res
+        return startep, endep
+
+
+    def updateTableEp(self, startep, endep):
+        res = self.getTableEp()
+        if res == None:
+            startep = min(self.startep, startep)
+            endep = max(self.endep, endep)
+            sql = """insert into tick_tableeps(table_name, codename, startep, endep, startdt, enddt)
+values('%s', '%s', %d, %d, '%s', '%s')""" % (self.table, self.codename, startep, endep, lib.epoch2dt(startep), lib.epoch2dt(endep))
+            self.updb.execSql(sql)
+            return
+        
+        (db_startep, db_endep) = res
+
+        if db_startep > startep:
+            sql = "update tick_tableeps set startep=%d, startdt='%s' where table_name='%s' and codename='%s';" % (startep, lib.epoch2dt(startep), self.table, self.codename)
+            self.updb.execSql(sql)
+
+        if db_endep < endep:
+            sql = "update tick_tableeps set endep=%d, enddt='%s' where table_name='%s' and codename='%s';" % (endep, lib.epoch2dt(endep), self.table, self.codename)
+            self.updb.execSql(sql)
+
+
+
+
+
     # must inherit
-    def initData(self, ohlcv, **args):
+    def calcTickValues(self, ohlcv):
         (ep, dt, o, h, l, c, v) = ohlcv
         self.ep = ep
         self.dt = dt
@@ -166,3 +241,10 @@ class Ticker(object):
         self._setCurrData(-1)
         return False
 
+    def initAttrFromArgs(self, args, name, default=None):
+        if name in args.keys():
+            setattr(self, name, args[name])
+        elif default is None:
+            raise Exception("%s is necessary!" % name)
+        else:
+            setattr(self, name, default)

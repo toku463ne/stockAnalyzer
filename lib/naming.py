@@ -25,14 +25,17 @@ def extendKmId(km_id):
     # km_name, km_groupid
     return (s[0], s[1])
 
+def getZigzagTableName(granularity, zz_size, zz_middle_size):
+        return "tick_zigzag_%s_%d_%d" % (granularity, zz_size, zz_middle_size)
+
 def getZzCodeTableName(granularity):
-        return "anal_zzcode_%s" % (granularity)
+    return "anal_zzcodes_%s" % (granularity)
 
-def getZzDataTableName(granularity, n_points):
-    return "anal_zzdata_%s_%d" % (granularity, n_points)
+def getZzPeaksTableName(granularity, zz_size, n_points):
+    return "anal_zzpeaks_%s_%d_%d" % (granularity, zz_size, n_points)
 
-def getZzItemTableName(granularity, zz_size, n_points):
-    return "anal_zzitems_%s_%d_%d" % (granularity, zz_size, n_points)
+#def getZzNormPeaksTableName(granularity, zz_size, n_points):
+#    return "anal_zznormpeaks_%s_%d_%d" % (granularity, zz_size, n_points)
 
 def getZzKmStatsTableName(granularity, zz_size, n_points):
     return "anal_zzkmstats_%s_%d_%d" % (granularity, zz_size, n_points)

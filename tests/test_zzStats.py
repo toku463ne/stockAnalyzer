@@ -8,7 +8,7 @@ import lib.backtests as backtests
 from consts import *
 from db.mysql import MySqlDB
 
-name = "test6"   
+trade_name = "test6"   
 """
 SELECT year(open_datetime) y, month(open_datetime) m, 
 sum(profit) p, count(profit) c
@@ -22,27 +22,34 @@ from trades
 where trade_name = 'test6';
 """
 
-def run_backtest(name, st, ed, os, buy_budget, sell_budget, profit):
+def run_backtest(trade_name, st, ed, os, buy_budget, sell_budget, profit):
     granularity = "D"
-    args = {"granularity": granularity, 
+    config = {"granularity": granularity, 
+        "classifier": "kmpeak_backtest",
         "min_profit": profit,
         "max_fund": 200000,
         "trade_mode": TRADE_MODE_BOTH,
-        "km_setname": "km20110101000020201231000096964fd8ed"
+        "data_dir": "app/stockAnalyzer/1",
+        "obsyear": 2020,
+        "startep": st,
+        "endep": ed,
+        "use_master": True
     }
     
-    #args["codenames"] = []
+    #config["codenames"] = []
     sql = """SELECT distinct i.codename FROM stockanalyzer.anal_zzitems_D_5_5 i
 left join stockanalyzer.anal_zzkmgroups_D_5_5 g on i.zzitemid = g.zzitemid
 where g.km_setid = 1
 and g.km_id in
-('212122_0000000007','212111_0000000007','212222_0000000007','121111_0000000003','121211_0000000006')
+('pek212212_0000000017','pek212112_0000000023','pek212122_0000000005','pek212112_0000000007','pek212222_0000000013','pek212122_0000000007',
+'pek212111_0000000004','pek121111_0000000031','pek121211_0000000001','pek121211_0000000021','pek121121_0000000018','pek211212_0000000000',
+'pek212212_0000000009','pek121222_0000000012','pek121111_0000000017')
 and i.codename in 
 (select distinct codename 
     FROM stockanalyzer.anal_zzcode_D c
     where obsyear = 2020 and min_nth_volume >= 100000)
 order by rand()
-limit 100
+limit 10
 ;"""
     codenames = []
     for (codename,) in MySqlDB().execSql(sql):
@@ -57,28 +64,28 @@ limit 100
     #'6804.T','3048.T','1973.T','8804.T','3865.T','8056.T','7984.T','7167.T','8918.T','9603.T','9532.T','7616.T',]
     
     #codenames = ["1911.T"]
-    args["codenames"] = codenames
+    config["codenames"] = codenames
 
     
     
-    #args["codenames"] = ['9997.T']
-    #args["codenames"] = []
+    #config["codenames"] = ['9997.T']
+    #config["codenames"] = []
     
-    args["market"] = "prime"
-    strategy = ZzStatsStrategy(args, use_master=True, load_zzdb=True)
+    config["market"] = "prime"
+    strategy = ZzStatsStrategy(config)
     # name, interval, startep, endep, strategy, orderstopep=0, buy_budget=1000000, sell_budget=1000000
-    report = backtests.runBacktest(name, granularity, st, ed, strategy, orderstopep=os,
+    report = backtests.runBacktest(trade_name, granularity, st, ed, strategy, orderstopep=os,
             buy_budget=buy_budget, sell_budget=buy_budget)
     return report
 
 
 class TestZzStatsStrategy(unittest.TestCase):
     def testCase1(self):
-        st = lib.str2epoch("2021-01-01T00:00:00") 
+        st = lib.str2epoch("2021-01-05T00:00:00") 
         ed = lib.str2epoch("2022-12-01T00:00:00")
         os = lib.str2epoch("2022-11-20T00:00:00")
         # name, st, ed, os, buy_budget, sell_budget, profit
-        report = run_backtest(name, st, ed, os, 1000000, 1000000, 10000)
+        report = run_backtest(trade_name, st, ed, os, 1000000, 1000000, 10000)
         #self.assertEqual(report["trade_count"],30)
         #self.assertEqual(report["codename"],"^N225")
         #self.assertGreater(report["sell_offline"], 0)

@@ -2,4 +2,4 @@
 
 #sudo service mysql start
 
-python3 analyzer/zz_analyzer.py
+python3 analyzer/zz/zz_analyzer.py
